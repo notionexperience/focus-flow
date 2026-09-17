@@ -1,4 +1,4 @@
-import { supabase } from './supabase-init.js';
+import { supabase } from './Front End/supabase-init.js';
 
 let currentUser = null;
 const LOCAL_STORAGE_KEY_TASKS = 'focusflow_guest_tasks';
