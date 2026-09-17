@@ -1,31 +1,28 @@
 import { supabase } from './supabase-init.js';
 
-let currentUser = null; // null if guest, user object if logged in
+let currentUser = null;
 const LOCAL_STORAGE_KEY_TASKS = 'focusflow_guest_tasks';
-// NEW: Changed to store an array of notes for guest mode
 const LOCAL_STORAGE_KEY_NOTES = 'focusflow_guest_notes'; 
-// NEW: Local storage key for guest goals
 const LOCAL_STORAGE_KEY_GOALS = 'focusflow_guest_goals';
 
-// --- Global object to store notification timers ---
-// This is crucial for being able to cancel scheduled notifications.
-// Key: task ID, Value: setTimeout ID
+
 const notificationTimers = {};
 
-// --- Global variable to store all tasks for filtering ---
+
 let allTasks = [];
+let allNotes = []; 
+let currentNoteId = null; 
 
-// NEW: Global variables for notes management
-let allNotes = []; // Stores all notes for the current user/guest
-let currentNoteId = null; // Tracks the ID of the currently active note
 
-// NEW: Set to store IDs of tasks whose subtasks are currently expanded
 const expandedTaskIds = new Set();
 
-// NEW: Global variable to store all goals
 let allGoals = [];
 
-// --- Local Storage Functions for Guest Mode ---
+// Shared icon markup for edit/delete buttons (replaces old emoji icons so every
+// edit/delete button in the app looks the same and is properly centered)
+const EDIT_ICON_SVG = `<svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>`;
+const DELETE_ICON_SVG = `<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>`;
+
 function getGuestTasks() {
     try {
         const tasks = localStorage.getItem(LOCAL_STORAGE_KEY_TASKS);
@@ -40,7 +37,6 @@ function saveGuestTasks(tasks) {
     localStorage.setItem(LOCAL_STORAGE_KEY_TASKS, JSON.stringify(tasks));
 }
 
-// NEW: Functions for guest notes (now an array of objects)
 function getGuestNotes() {
     try {
         const notes = localStorage.getItem(LOCAL_STORAGE_KEY_NOTES);
@@ -55,7 +51,6 @@ function saveGuestNotes(notes) {
     localStorage.setItem(LOCAL_STORAGE_KEY_NOTES, JSON.stringify(notes));
 }
 
-// NEW: Functions for guest goals
 function getGuestGoals() {
     try {
         const goals = localStorage.getItem(LOCAL_STORAGE_KEY_GOALS);
@@ -78,8 +73,8 @@ async function migrateGuestDataToSupabase() {
     }
 
     const guestTasks = getGuestTasks();
-    const guestNotes = getGuestNotes(); // Now gets an array
-    const guestGoals = getGuestGoals(); // NEW: Get guest goals
+    const guestNotes = getGuestNotes();
+    const guestGoals = getGuestGoals(); 
 
     if (guestTasks.length > 0) {
         console.log("Migrating guest tasks to Supabase...");
@@ -89,18 +84,16 @@ async function migrateGuestDataToSupabase() {
             is_done: task.is_done,
             category: task.category,
             priority: task.priority,
-            // Ensure due_date is correctly formatted as ISO string if it exists
             due_date: task.due_date ? new Date(task.due_date).toISOString() : null,
             position: task.position || 0,
             notification_time: task.notification_time || null,
-            subtasks: task.subtasks || [], // Include subtasks
-            attachments: task.attachments || [], // Include attachments
-            // NEW: Recurrence fields
+            subtasks: task.subtasks || [],
+            attachments: task.attachments || [], 
             recurrence_type: task.recurrence_type || 'none',
             recurrence_details: task.recurrence_details || {},
-            original_task_id: task.original_task_id || null, // For instances of recurring tasks
-            next_occurrence_date: task.next_occurrence_date || null, // When the next instance should be created
-            goal_id: task.goal_id || null, // NEW: Include goal_id
+            original_task_id: task.original_task_id || null,
+            next_occurrence_date: task.next_occurrence_date || null,
+            goal_id: task.goal_id || null,
         }));
 
         const { error: tasksError } = await supabase.from("tasks").insert(tasksToInsert, { ignoreDuplicates: true });
@@ -112,7 +105,6 @@ async function migrateGuestDataToSupabase() {
         }
     }
 
-    // NEW: Migrate guest notes (now an array)
     if (guestNotes.length > 0) {
         console.log("Migrating guest notes to Supabase...");
         const notesToInsert = guestNotes.map(note => ({
@@ -124,8 +116,6 @@ async function migrateGuestDataToSupabase() {
             updated_at: note.updated_at || new Date().toISOString(),
         }));
 
-        // Use upsert for notes to handle potential existing notes (though unlikely for guest migration)
-        // onConflict: 'id' or 'title, user_id' if you want to prevent duplicate titles per user
         const { error: notesError } = await supabase.from("notes").upsert(notesToInsert, { onConflict: 'id' });
         if (notesError) {
             console.error("Error migrating guest notes:", notesError.message);
@@ -135,7 +125,6 @@ async function migrateGuestDataToSupabase() {
         }
     }
 
-    // NEW: Migrate guest goals
     if (guestGoals.length > 0) {
         console.log("Migrating guest goals to Supabase...");
         const goalsToInsert = guestGoals.map(goal => ({
@@ -248,10 +237,9 @@ async function checkUserAndLoadApp() {
   await loadGoals(); // NEW: Load goals before tasks so they can be linked
   await loadTasks();
   await loadNotes(); // NEW: Load multiple notes
-  // NEW: Check and generate recurring tasks on app load
-  if (currentUser) {
-    await generateRecurringTasks();
-  }
+  // NEW: Check and generate recurring tasks on app load (works for logged-in
+  // users AND guest/local-storage mode)
+  await generateRecurringTasks();
 }
 
 // --- Data Persistence Functions (Conditional Logic) ---
@@ -287,6 +275,7 @@ async function loadTasks() {
     populateCategoryFilter(allTasks);
     populatePriorityFilter(allTasks);
     populateGoalFilter(allGoals); // NEW: Populate goal filter for tasks
+    populateTimerTaskSelect(allTasks); // Keep the Pomodoro timer's task-link dropdown in sync
 
     filterTasks(); // Apply filters and render tasks initially
 
@@ -413,9 +402,8 @@ async function updateTask(taskId, updates) {
             scheduleTaskNotification(currentTask);
         }
     }
-    // NEW: If task completion status or goal_id changes, update goal progress
     if (updates.is_done !== undefined || updates.goal_id !== undefined) {
-        await loadGoals(); // Reload goals to recalculate progress
+        await loadGoals();
     }
 }
 
@@ -424,9 +412,6 @@ async function deleteTask(id) {
     clearScheduledNotification(id);
 
     if (currentUser) {
-        // Optional: If you implement actual Supabase Storage, you might want to
-        // delete associated files from storage here before deleting the task.
-        // This would require fetching the task's attachments first.
         const taskToDelete = allTasks.find(t => t.id == id);
         if (taskToDelete && taskToDelete.attachments && taskToDelete.attachments.length > 0) {
             const filePaths = taskToDelete.attachments.map(att => att.file_path).filter(Boolean);
@@ -454,10 +439,9 @@ async function deleteTask(id) {
         console.log("Deleted task from Local Storage (Guest Mode):", id);
     }
     await updateTaskPositionsInDB();
-    await loadGoals(); // NEW: Reload goals as a task might have been linked to a goal
+    await loadGoals();
 }
 
-// NEW: Functions for multiple notes
 async function loadNotes() {
     const noteListContainer = document.getElementById("note-list-container");
     if (!noteListContainer) { console.error("Note list container not found!"); return; }
@@ -486,16 +470,14 @@ async function loadNotes() {
     populateNoteCategoryFilter(allNotes); // Populate category filter for notes
     filterNotes(); // Filter and render notes initially
     
-    // Select the first note if available, or create a new one
     if (allNotes.length > 0) {
-        // Ensure currentNoteId is valid, otherwise default to first note
         if (!currentNoteId || !allNotes.some(note => note.id === currentNoteId)) {
             selectNote(allNotes[0].id);
         } else {
-            selectNote(currentNoteId); // Re-select the currently active note
+            selectNote(currentNoteId); 
         }
     } else {
-        createNote(); // Create a default empty note if none exist
+        createNote(); 
     }
 }
 
@@ -511,7 +493,7 @@ async function saveNote(noteId, title, content, category) {
     if (currentUser) {
         const { error } = await supabase.from("notes").upsert(
             { id: noteId, user_id: currentUser.id, ...updates },
-            { onConflict: 'id' } // Conflict on ID to update existing note
+            { onConflict: 'id' } 
         );
         if (error) console.error("Failed to save note to Supabase:", error.message);
     } else {
@@ -520,21 +502,19 @@ async function saveNote(noteId, title, content, category) {
         if (noteIndex !== -1) {
             guestNotes[noteIndex] = { ...guestNotes[noteIndex], ...updates };
         } else {
-            // This case should ideally not happen if createNote is always called first
             console.warn("Attempted to save non-existent guest note. Creating new one.");
             guestNotes.push({ id: noteId, ...updates, created_at: updated_at });
         }
         saveGuestNotes(guestNotes);
         console.log("Saved note to Local Storage (Guest Mode):", noteId);
     }
-    // After saving, reload notes to update the list and re-select the current note
     await loadNotes();
-    selectNote(noteId); // Re-select to ensure UI consistency
+    selectNote(noteId); 
 }
 
 async function createNote() {
     const newNote = {
-        id: crypto.randomUUID(), // Generate a unique ID for the new note
+        id: crypto.randomUUID(),
         title: "New Note",
         content: "",
         category: "General",
@@ -551,13 +531,13 @@ async function createNote() {
             console.error("Failed to create note in Supabase:", error.message);
             return;
         }
-        allNotes.unshift(data[0]); // Add to the beginning of the local array
+        allNotes.unshift(data[0]); 
     } else {
-        allNotes.unshift(newNote); // Add to the beginning of the local array
+        allNotes.unshift(newNote); 
         saveGuestNotes(allNotes);
     }
-    await loadNotes(); // Reload notes to update the list
-    selectNote(newNote.id); // Select the newly created note
+    await loadNotes(); 
+    selectNote(newNote.id); 
 }
 
 async function deleteNote(noteId) {
@@ -574,9 +554,9 @@ async function deleteNote(noteId) {
             allNotes = allNotes.filter(note => note.id !== noteId);
             saveGuestNotes(allNotes);
         }
-        currentNoteId = null; // Clear current selection
+        currentNoteId = null; 
 
-        await loadNotes(); // Reload notes to update the list and select a new one or create empty
+        await loadNotes(); 
     });
 }
 
@@ -589,17 +569,14 @@ function selectNote(noteId) {
         const deleteNoteButton = document.getElementById("deleteNoteButton");
 
         noteTitleInput.value = note.title;
-        // Ensure category option exists before setting value
         ensureOptionExists(noteCategorySelect, note.category);
         noteCategorySelect.value = note.category || "General";
         
-        // Set content in Quill editor
         if (quill) {
             quill.root.innerHTML = note.content;
             quill.focus(); // Focus the editor
         }
 
-        // Update selected class in the list
         document.querySelectorAll('.note-list-item').forEach(item => {
             item.classList.remove('selected');
         });
@@ -608,9 +585,8 @@ function selectNote(noteId) {
             selectedItem.classList.add('selected');
         }
 
-        deleteNoteButton.disabled = false; // Enable delete button for selected note
+        deleteNoteButton.disabled = false;
     } else {
-        // If selected note not found (e.g., deleted), clear editor and disable delete
         currentNoteId = null;
         document.getElementById("noteTitleInput").value = "";
         document.getElementById("noteCategorySelect").value = "General";
@@ -626,7 +602,6 @@ function renderNoteList(notesToRender = allNotes) {
 
     if (notesToRender.length === 0) {
         noteListContainer.innerHTML = '<p class="empty-state">No notes found. Click "New Note" to create one!</p>';
-        // If no notes, ensure the delete button is disabled and editor is clear
         document.getElementById("deleteNoteButton").disabled = true;
         document.getElementById("noteTitleInput").value = "";
         document.getElementById("noteCategorySelect").value = "General";
@@ -659,8 +634,6 @@ function renderNoteList(notesToRender = allNotes) {
     noteListContainer.appendChild(ul);
 }
 
-
-// NEW: Goal Management Functions
 async function loadGoals() {
     const goalList = document.getElementById("goalList");
     const noGoalsMessage = document.getElementById("noGoalsMessage");
@@ -690,13 +663,9 @@ async function loadGoals() {
         });
         console.log("Loaded goals from Local Storage (Guest Mode):", goals);
     }
-    allGoals = goals; // Store all goals in the global variable
-
-    // Populate goal select dropdowns in task modals
+    allGoals = goals; 
     populateGoalSelect(allGoals);
-    // Populate goal filter dropdown for tasks
     populateGoalFilter(allGoals);
-    // Render goals after tasks are loaded (to calculate progress)
     filterGoals();
 }
 
@@ -722,12 +691,13 @@ async function addGoal(title, description, startDate, dueDate, status) {
     } else {
         const guestGoals = getGuestGoals();
         newGoal = {
-            id: crypto.randomUUID(), // Use crypto.randomUUID() for unique ID in guest mode
+            id: crypto.randomUUID(),
             title: title,
             description: description,
             start_date: startDate,
             due_date: dueDate,
             status: status,
+            position: guestGoals.length,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         };
@@ -735,7 +705,7 @@ async function addGoal(title, description, startDate, dueDate, status) {
         saveGuestGoals(guestGoals);
         console.log("Added goal to Local Storage (Guest Mode):", newGoal);
     }
-    await loadGoals(); // Reload goals to update the list
+    await loadGoals(); 
     return newGoal;
 }
 
@@ -755,12 +725,11 @@ async function updateGoal(goalId, updates) {
             saveGuestGoals(guestGoals);
         }
     }
-    await loadGoals(); // Reload goals to update the list and progress
+    await loadGoals(); 
 }
 
 async function deleteGoal(goalId) {
     showCustomConfirm("Are you sure you want to delete this goal? All linked tasks will be unlinked.", async () => {
-        // First, unlink all tasks associated with this goal
         const tasksToUnlink = allTasks.filter(task => task.goal_id === goalId);
         for (const task of tasksToUnlink) {
             await updateTask(task.id, { goal_id: null });
@@ -778,8 +747,8 @@ async function deleteGoal(goalId) {
             allGoals = allGoals.filter(goal => goal.id !== goalId);
             saveGuestGoals(allGoals);
         }
-        await loadGoals(); // Reload goals
-        await loadTasks(); // Reload tasks to reflect unlinking
+        await loadGoals(); 
+        await loadTasks(); 
     });
 }
 
@@ -793,25 +762,35 @@ function calculateGoalProgress(goalId) {
     return { completed: completedTasks, total: linkedTasks.length, percentage: percentage };
 }
 
+const GOAL_LINKED_TASKS_PREVIEW_COUNT = 3;
+
 function createGoalElement(goal) {
     const li = document.createElement("li");
     li.classList.add("goal-item");
     li.dataset.goalId = goal.id;
-    li.dataset.status = goal.status; // For filtering
+    li.dataset.status = goal.status;
+    li.dataset.position = goal.position ?? 0;
+    li.draggable = false; // toggled true only while the drag handle is pressed
 
     const header = document.createElement("div");
     header.classList.add("goal-item-header");
     li.appendChild(header);
 
+    // NEW: Drag handle — grabbing this (rather than the whole card) reorders the
+    // goal, so it doesn't fight with clicking the status select or the quick-add
+    // input inside the card.
+    const dragHandle = document.createElement("span");
+    dragHandle.classList.add("goal-drag-handle");
+    dragHandle.setAttribute("aria-hidden", "true");
+    dragHandle.title = "Drag to reorder";
+    dragHandle.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"></circle><circle cx="8" cy="12" r="1.6"></circle><circle cx="8" cy="18" r="1.6"></circle><circle cx="16" cy="6" r="1.6"></circle><circle cx="16" cy="12" r="1.6"></circle><circle cx="16" cy="18" r="1.6"></circle></svg>`;
+    header.appendChild(dragHandle);
+
     const titleDisplay = document.createElement("span");
     titleDisplay.classList.add("goal-title-display");
     titleDisplay.textContent = goal.title;
+    titleDisplay.title = goal.title;
     header.appendChild(titleDisplay);
-
-    const statusLabel = document.createElement("span");
-    statusLabel.classList.add("goal-status-label", goal.status);
-    statusLabel.textContent = goal.status.charAt(0).toUpperCase() + goal.status.slice(1); // Capitalize first letter
-    header.appendChild(statusLabel);
 
     const datesDisplay = document.createElement("span");
     datesDisplay.classList.add("goal-dates-display");
@@ -824,41 +803,204 @@ function createGoalElement(goal) {
         const descriptionDisplay = document.createElement("p");
         descriptionDisplay.classList.add("goal-description-display");
         descriptionDisplay.textContent = goal.description;
+        descriptionDisplay.title = goal.description;
         li.appendChild(descriptionDisplay);
     }
 
-    // Progress Bar
+    // Progress Bar - compact, single row (bar + % text) instead of a full-width bar
+    // followed by a separate text line.
     const progressData = calculateGoalProgress(goal.id);
+    const progressRow = document.createElement("div");
+    progressRow.classList.add("goal-progress-row");
+    li.appendChild(progressRow);
+
     const progressContainer = document.createElement("div");
     progressContainer.classList.add("goal-progress-container");
-    li.appendChild(progressContainer);
+    progressRow.appendChild(progressContainer);
 
     const progressBar = document.createElement("div");
     progressBar.classList.add("goal-progress-bar");
     progressBar.style.width = `${progressData.percentage}%`;
     progressContainer.appendChild(progressBar);
 
-    const progressText = document.createElement("p");
+    const progressText = document.createElement("span");
     progressText.classList.add("goal-progress-text");
-    progressText.textContent = `Progress: ${progressData.completed}/${progressData.total} tasks (${progressData.percentage.toFixed(0)}%)`;
-    li.appendChild(progressText);
+    progressText.textContent = `${progressData.completed}/${progressData.total} (${progressData.percentage.toFixed(0)}%)`;
+    progressRow.appendChild(progressText);
 
-    // Actions
+    // List the actual tasks linked to this goal, capped to a short preview with a
+    // "show more" toggle so the card doesn't grow unbounded.
+    const linkedTasks = allTasks.filter(task => task.goal_id === goal.id);
+    if (linkedTasks.length > 0) {
+        const linkedTasksList = document.createElement("ul");
+        linkedTasksList.classList.add("goal-linked-tasks");
+
+        const renderTaskItem = (task) => {
+            const taskItem = document.createElement("li");
+            taskItem.classList.add("goal-linked-task-item");
+            if (task.is_done) taskItem.classList.add("done");
+
+            const checkMark = document.createElement("span");
+            checkMark.classList.add("goal-linked-task-check");
+            checkMark.textContent = task.is_done ? "✔" : "○";
+            taskItem.appendChild(checkMark);
+
+            const taskLabel = document.createElement("span");
+            taskLabel.classList.add("goal-linked-task-label");
+            taskLabel.textContent = task.content;
+            taskItem.appendChild(taskLabel);
+
+            taskItem.title = task.content;
+            taskItem.addEventListener("click", () => {
+                const goalFilter = document.getElementById("goalFilter");
+                const toggleGoalsBtn = document.getElementById("toggleGoals");
+                const goalsSection = document.getElementById("goalsSection");
+                if (goalFilter) {
+                    goalFilter.value = goal.id;
+                    filterTasks();
+                }
+                // Switch back to the task list view so the filtered task is visible
+                if (goalsSection && goalsSection.style.display !== "none") {
+                    if (toggleGoalsBtn) toggleGoalsBtn.click();
+                }
+            });
+
+            return taskItem;
+        };
+
+        linkedTasks.slice(0, GOAL_LINKED_TASKS_PREVIEW_COUNT).forEach(task => {
+            linkedTasksList.appendChild(renderTaskItem(task));
+        });
+
+        const remaining = linkedTasks.length - GOAL_LINKED_TASKS_PREVIEW_COUNT;
+        if (remaining > 0) {
+            const showMoreBtn = document.createElement("button");
+            showMoreBtn.type = "button";
+            showMoreBtn.classList.add("goal-show-more-tasks");
+            showMoreBtn.textContent = `+ ${remaining} more task${remaining > 1 ? "s" : ""}`;
+            showMoreBtn.addEventListener("click", () => {
+                showMoreBtn.remove();
+                linkedTasks.slice(GOAL_LINKED_TASKS_PREVIEW_COUNT).forEach(task => {
+                    linkedTasksList.appendChild(renderTaskItem(task));
+                });
+            });
+            linkedTasksList.appendChild(showMoreBtn);
+        }
+
+        li.appendChild(linkedTasksList);
+    }
+
+    // Quick-add: create a task pre-linked to this goal without leaving the card.
+    const addTaskForm = document.createElement("div");
+    addTaskForm.classList.add("goal-add-task-form");
+
+    const addTaskInput = document.createElement("input");
+    addTaskInput.type = "text";
+    addTaskInput.classList.add("input", "goal-add-task-input");
+    addTaskInput.placeholder = "+ Add task to this goal…";
+    addTaskInput.setAttribute("aria-label", `Add task to ${goal.title}`);
+    addTaskForm.appendChild(addTaskInput);
+
+    const addTaskBtn = document.createElement("button");
+    addTaskBtn.type = "button";
+    addTaskBtn.classList.add("button", "goal-add-task-button");
+    addTaskBtn.textContent = "Add";
+    addTaskForm.appendChild(addTaskBtn);
+
+    const submitGoalTask = async () => {
+        const text = addTaskInput.value.trim();
+        if (!text) return;
+        addTaskBtn.disabled = true;
+        const newTask = await addTask(text, "Personal", "Medium", null, null, [], 'none', {}, goal.id);
+        addTaskBtn.disabled = false;
+        if (newTask) {
+            addTaskInput.value = "";
+            await loadTasks();
+            await loadGoals();
+        }
+    };
+    addTaskBtn.addEventListener("click", submitGoalTask);
+    addTaskInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            submitGoalTask();
+        }
+    });
+
+    li.appendChild(addTaskForm);
+
+    // NEW: Footer — status, edit and delete are now grouped together in one row
+    // instead of status living in the header and edit/delete floating separately.
+    const footer = document.createElement("div");
+    footer.classList.add("goal-footer");
+    li.appendChild(footer);
+
+    // Status is editable directly on the card (no need to open the edit modal
+    // just to mark a goal completed/archived).
+    const statusSelect = document.createElement("select");
+    statusSelect.classList.add("goal-status-select", goal.status);
+    statusSelect.setAttribute("aria-label", `Status for ${goal.title}`);
+    ["active", "completed", "archived"].forEach(statusValue => {
+        const option = document.createElement("option");
+        option.value = statusValue;
+        option.textContent = statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
+        if (statusValue === goal.status) option.selected = true;
+        statusSelect.appendChild(option);
+    });
+    statusSelect.addEventListener("click", (e) => e.stopPropagation());
+    statusSelect.addEventListener("change", async (e) => {
+        const newStatus = e.target.value;
+        statusSelect.classList.remove("active", "completed", "archived");
+        statusSelect.classList.add(newStatus);
+        await updateGoal(goal.id, { status: newStatus });
+    });
+    footer.appendChild(statusSelect);
+
     const actionsDiv = document.createElement("div");
     actionsDiv.classList.add("goal-actions");
-    li.appendChild(actionsDiv);
+    footer.appendChild(actionsDiv);
 
     const editBtn = document.createElement("button");
-    editBtn.classList.add("button", "edit-button");
-    editBtn.textContent = "Edit";
+    editBtn.classList.add("edit-button");
+    editBtn.innerHTML = EDIT_ICON_SVG;
+    editBtn.title = "Edit goal";
+    editBtn.setAttribute('aria-label', 'Edit goal');
     editBtn.addEventListener("click", () => showGoalModal(goal));
     actionsDiv.appendChild(editBtn);
 
     const deleteBtn = document.createElement("button");
-    deleteBtn.classList.add("button", "button-secondary", "delete-button");
-    deleteBtn.textContent = "Delete";
+    deleteBtn.classList.add("delete-button");
+    deleteBtn.innerHTML = DELETE_ICON_SVG;
+    deleteBtn.title = "Delete goal";
+    deleteBtn.setAttribute('aria-label', 'Delete goal');
     deleteBtn.addEventListener("click", () => deleteGoal(goal.id));
     actionsDiv.appendChild(deleteBtn);
+
+    // NEW: Drag-and-drop reordering, initiated only from the drag handle.
+    const startDrag = () => { li.draggable = true; };
+    const stopDragFlag = () => { li.draggable = false; };
+    dragHandle.addEventListener("mousedown", startDrag);
+    dragHandle.addEventListener("touchstart", startDrag, { passive: true });
+    dragHandle.addEventListener("mouseup", stopDragFlag);
+
+    li.addEventListener("dragstart", e => {
+        li.classList.add("dragging");
+        draggedGoalItem = li;
+        try {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", String(goal.id));
+        } catch (err) { /* some browsers restrict dataTransfer access; safe to ignore */ }
+    });
+
+    li.addEventListener("dragend", () => {
+        li.draggable = false;
+        li.classList.remove("dragging");
+        document.querySelectorAll("#goalList .goal-item").forEach(item => {
+            item.classList.remove("dragover-top", "dragover-bottom");
+        });
+        draggedGoalItem = null;
+        updateGoalPositionsInDB();
+    });
 
     return li;
 }
@@ -878,6 +1020,129 @@ function renderGoals(goalsToRender) {
             goalList.appendChild(li);
         });
     }
+    initGoalListDragAndDrop();
+}
+
+// NEW: Drag-and-drop reordering for goal cards.
+// The goal list renders as a CSS grid (cards can sit side-by-side), so instead of
+// just comparing against the single card under the cursor (which works fine for a
+// simple vertical list like #taskList), we find whichever card's center is
+// geometrically closest to the cursor and insert before/after that one.
+let draggedGoalItem = null;
+
+function getGoalDropTarget(container, x, y) {
+    const items = [...container.querySelectorAll(".goal-item:not(.dragging)")];
+    let closest = null;
+    let closestDistance = Infinity;
+
+    items.forEach(item => {
+        const box = item.getBoundingClientRect();
+        const centerX = box.left + box.width / 2;
+        const centerY = box.top + box.height / 2;
+        const distance = Math.hypot(x - centerX, y - centerY);
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closest = { item, box };
+        }
+    });
+
+    if (!closest) return { element: null, insertBefore: true };
+    const insertBefore = y < closest.box.top + closest.box.height / 2;
+    return { element: closest.item, insertBefore };
+}
+
+function initGoalListDragAndDrop() {
+    const goalList = document.getElementById("goalList");
+    if (!goalList || goalList.dataset.dndInit === "true") return;
+    goalList.dataset.dndInit = "true";
+
+    goalList.addEventListener("dragover", e => {
+        if (!draggedGoalItem) return;
+        e.preventDefault();
+
+        goalList.querySelectorAll(".goal-item").forEach(item => {
+            item.classList.remove("dragover-top", "dragover-bottom");
+        });
+
+        const { element, insertBefore } = getGoalDropTarget(goalList, e.clientX, e.clientY);
+        if (element) {
+            element.classList.add(insertBefore ? "dragover-top" : "dragover-bottom");
+        }
+    });
+
+    goalList.addEventListener("drop", e => {
+        if (!draggedGoalItem) return;
+        e.preventDefault();
+
+        goalList.querySelectorAll(".goal-item").forEach(item => {
+            item.classList.remove("dragover-top", "dragover-bottom");
+        });
+
+        const { element, insertBefore } = getGoalDropTarget(goalList, e.clientX, e.clientY);
+        if (element && element !== draggedGoalItem) {
+            if (insertBefore) {
+                goalList.insertBefore(draggedGoalItem, element);
+            } else {
+                goalList.insertBefore(draggedGoalItem, element.nextSibling);
+            }
+        } else if (!element) {
+            goalList.appendChild(draggedGoalItem);
+        }
+    });
+}
+
+async function updateGoalPositionsInDB() {
+    const goalList = document.getElementById("goalList");
+    if (!goalList) return;
+
+    const goalsInOrder = Array.from(goalList.children)
+        .filter(li => li.classList.contains("goal-item"))
+        .map((li, index) => ({ id: li.dataset.goalId, position: index }));
+
+    if (goalsInOrder.length === 0) return;
+
+    // Keep the manual order sticky so it isn't immediately overwritten by the
+    // default due-date/created-date sort the next time the list re-renders.
+    const goalSortOrderSelect = document.getElementById("goalSortOrder");
+    if (goalSortOrderSelect && Array.from(goalSortOrderSelect.options).some(o => o.value === "custom")) {
+        goalSortOrderSelect.value = "custom";
+    }
+
+    goalsInOrder.forEach(({ id, position }) => {
+        const goal = allGoals.find(g => String(g.id) === String(id));
+        if (goal) goal.position = position;
+    });
+
+    if (currentUser) {
+        for (const { id, position } of goalsInOrder) {
+            const { error } = await supabase
+                .from("goals")
+                .update({ position })
+                .eq("id", id)
+                .eq("user_id", currentUser.id);
+            if (error) {
+                // If the `goals` table doesn't have a `position` column yet, this
+                // will fail — reordering still works for the current session, it
+                // just won't survive a reload until that column is added.
+                console.error(`Failed to update position for goal ${id} in Supabase:`, error.message);
+                break;
+            }
+        }
+    } else {
+        let guestGoals = getGuestGoals();
+        goalsInOrder.forEach(({ id, position }) => {
+            const idx = guestGoals.findIndex(g => String(g.id) === String(id));
+            if (idx !== -1) guestGoals[idx].position = position;
+        });
+        saveGuestGoals(guestGoals);
+    }
+}
+
+// NEW: Truncate long goal titles so they don't blow out native <select> dropdowns;
+// the full title is still available via the option's title tooltip.
+function truncateForOption(text, maxLength = 42) {
+    if (!text) return "";
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1).trimEnd()}…` : text;
 }
 
 function populateGoalSelect(goals) {
@@ -885,27 +1150,26 @@ function populateGoalSelect(goals) {
     const editGoalSelect = document.getElementById("editGoalSelect");
     if (!goalSelect || !editGoalSelect) return;
 
-    // Store current values to re-select after repopulating
     const currentGoalSelectValue = goalSelect.value;
     const currentEditGoalSelectValue = editGoalSelect.value;
 
-    // Clear existing options, keeping "No Goal"
     goalSelect.innerHTML = '<option value="none">No Goal</option>';
     editGoalSelect.innerHTML = '<option value="none">No Goal</option>';
 
     goals.forEach(goal => {
         const option = document.createElement('option');
         option.value = goal.id;
-        option.textContent = goal.title;
+        option.textContent = truncateForOption(goal.title);
+        option.title = goal.title;
         goalSelect.appendChild(option);
 
         const editOption = document.createElement('option');
         editOption.value = goal.id;
-        editOption.textContent = goal.title;
+        editOption.textContent = truncateForOption(goal.title);
+        editOption.title = goal.title;
         editGoalSelect.appendChild(editOption);
     });
 
-    // Restore previous selections
     if (Array.from(goalSelect.options).some(opt => opt.value === currentGoalSelectValue)) {
         goalSelect.value = currentGoalSelectValue;
     } else {
@@ -928,7 +1192,8 @@ function populateGoalFilter(goals) {
     goals.forEach(goal => {
         const option = document.createElement('option');
         option.value = goal.id;
-        option.textContent = goal.title;
+        option.textContent = truncateForOption(goal.title);
+        option.title = goal.title;
         goalFilter.appendChild(option);
     });
 
@@ -939,8 +1204,6 @@ function populateGoalFilter(goals) {
     }
 }
 
-
-// --- Helper / UI Functions ---
 
 function renderTasks(tasksToRender) {
   const taskList = document.getElementById("taskList");
@@ -991,7 +1254,6 @@ if (currentUser) {
     }
 }
 
-
 function updateTaskCounter() {
   const taskList = document.getElementById("taskList");
   if (!taskList) return;
@@ -1004,11 +1266,9 @@ function updateTaskCounter() {
     counterSpan.textContent = ` Tasks: ${finishedTasks} / ${totalTasks} completed`;
   }
 }
-// Theme Toggling
 const themeToggleBtn = document.getElementById("themeToggle");
 const storedTheme = localStorage.getItem("theme");
 
-// Apply stored theme on load
 if (storedTheme) {
     document.body.setAttribute("data-theme", storedTheme);
     if (themeToggleBtn) {
@@ -1026,16 +1286,37 @@ if (themeToggleBtn) {
     });
 }
 
-// Timer variables and functions
-let time = 0;
-let timerInterval;
+// --- Pomodoro Timer (compact circular timer, pausable, presets, task-linked) ---
+const POMODORO_PRESETS = { pomodoro: { minutes: 25, label: "Focus Session" }, short: { minutes: 5, label: "Short Break" }, long: { minutes: 15, label: "Long Break" } };
+const POMODORO_RING_RADIUS = 88;
+const POMODORO_RING_CIRCUMFERENCE = 2 * Math.PI * POMODORO_RING_RADIUS;
+
+let time = 0; // remaining seconds (can be fractional while running, for a smooth ring)
+let totalTime = 0; // seconds the current session started with
+let timerAnimationId = null;
+let isTimerRunning = false;
+let timerStartedAt = 0; // performance.now() when started/resumed
+let timerDurationWhenStarted = 0;
+let currentTimerMode = "pomodoro";
+let linkedTimerTaskId = null;
+
 const timerElement = document.getElementById("timer");
 const timeInput = document.getElementById("timeInput");
 const setButton = document.getElementById("setButton");
 const startButton = document.getElementById("startButton");
-const stopButton = document.getElementById("stopButton");
+const pauseButton = document.getElementById("pauseButton");
+const stopButton = document.getElementById("stopButton"); // acts as "Reset"
+const timerSessionLabel = document.getElementById("timerSessionLabel");
+const timerRingProgress = document.getElementById("timerRingProgress");
+const timerTaskSelect = document.getElementById("timerTaskSelect");
+const timerModeButtons = document.querySelectorAll(".mode-button");
 
 const timerEndSound = document.getElementById('timerEndSound');
+
+if (timerRingProgress) {
+    timerRingProgress.style.strokeDasharray = `${POMODORO_RING_CIRCUMFERENCE}`;
+    timerRingProgress.style.strokeDashoffset = "0";
+}
 
 function requestNotificationPermission() {
     if ("Notification" in window && Notification.permission !== "granted") {
@@ -1054,75 +1335,159 @@ function requestNotificationPermission() {
     }
 }
 
-function timerFinished() {
+function updateTimerDisplay() {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    if (timerElement) timerElement.textContent = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+
+    if (timerRingProgress && totalTime > 0) {
+        const progressRatio = Math.max(0, Math.min(1, time / totalTime));
+        timerRingProgress.style.strokeDashoffset = `${POMODORO_RING_CIRCUMFERENCE * (1 - progressRatio)}`;
+    }
+}
+
+function setTimer(minutes = parseInt(timeInput.value)) {
+    if (isNaN(minutes) || minutes <= 0) {
+        showCustomAlert("Please enter a valid positive number for minutes.");
+        minutes = POMODORO_PRESETS[currentTimerMode].minutes;
+        if (timeInput) timeInput.value = minutes;
+    }
+
+    time = minutes * 60;
+    totalTime = minutes * 60;
+
+    cancelAnimationFrame(timerAnimationId);
+    isTimerRunning = false;
+    if (startButton) startButton.style.display = "inline-block";
+    if (pauseButton) pauseButton.style.display = "none";
+    if (timerElement) timerElement.classList.remove("active");
+
+    updateTimerDisplay();
+}
+
+function setTimerMode(mode) {
+    if (!POMODORO_PRESETS[mode]) return;
+    currentTimerMode = mode;
+    timerModeButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.mode === mode));
+    if (timerSessionLabel) timerSessionLabel.textContent = POMODORO_PRESETS[mode].label;
+    if (timeInput) timeInput.value = POMODORO_PRESETS[mode].minutes;
+
+    // Linking a task only makes sense for a Focus session — a break finishing
+    // shouldn't be able to mark anything as done.
+    const timerTaskLinkField = document.querySelector(".timer-task-link");
+    if (timerTaskLinkField) timerTaskLinkField.style.display = mode === "pomodoro" ? "" : "none";
+    if (mode !== "pomodoro") {
+        linkedTimerTaskId = null;
+        if (timerTaskSelect) timerTaskSelect.value = "none";
+    }
+
+    setTimer(POMODORO_PRESETS[mode].minutes);
+}
+
+function startTimer() {
+    if (isTimerRunning || time <= 0) {
+        if (time <= 0) showCustomAlert("Timer has finished. Please set a new time.");
+        return;
+    }
+
+    isTimerRunning = true;
+    if (startButton) startButton.style.display = "none";
+    if (pauseButton) pauseButton.style.display = "inline-block";
+    if (timerElement) timerElement.classList.add("active");
+
+    timerStartedAt = performance.now();
+    timerDurationWhenStarted = time;
+
+    function animateTimer(now) {
+        if (!isTimerRunning) return;
+        const elapsed = (now - timerStartedAt) / 1000;
+        time = Math.max(0, timerDurationWhenStarted - elapsed);
+        updateTimerDisplay();
+
+        if (time <= 0) {
+            timerFinished();
+            return;
+        }
+        timerAnimationId = requestAnimationFrame(animateTimer);
+    }
+    timerAnimationId = requestAnimationFrame(animateTimer);
+}
+
+function pauseTimer() {
+    if (!isTimerRunning) return;
+    isTimerRunning = false;
+    if (startButton) startButton.style.display = "inline-block";
+    if (pauseButton) pauseButton.style.display = "none";
+    if (timerElement) timerElement.classList.remove("active");
+    cancelAnimationFrame(timerAnimationId);
+}
+
+function stopTimer() {
+    // "Reset" button: stop and restore the timer to the currently set minutes.
+    pauseTimer();
+    setTimer(parseInt(timeInput.value));
+}
+
+async function timerFinished() {
+    pauseTimer();
+
     if (timerEndSound) {
         timerEndSound.play().catch(e => console.error("Error playing sound:", e));
     }
 
     if ("Notification" in window && Notification.permission === "granted") {
         new Notification("FocusFlow Timer", {
-            body: "Your main timer has finished!",
+            body: `Your ${POMODORO_PRESETS[currentTimerMode].label.toLowerCase()} has finished!`,
             icon: "./assets/logo.png"
         });
     } else {
         showCustomAlert("Time's up!");
     }
 
-    if(timerElement) timerElement.textContent = "Time's up!";
-    if (startButton) startButton.disabled = false;
-    if (stopButton) stopButton.disabled = true;
+    if (timerElement) timerElement.textContent = "00:00";
+
+    // Only a finished Focus session can complete a linked task — breaks never do.
+    if (currentTimerMode === "pomodoro" && linkedTimerTaskId) {
+        const taskToUpdate = allTasks.find(task => task.id == linkedTimerTaskId);
+        if (taskToUpdate && !taskToUpdate.is_done) {
+            await updateTask(linkedTimerTaskId, { is_done: true });
+            showCustomAlert(`Task "${taskToUpdate.content}" marked as completed!`);
+            await loadTasks();
+        }
+        linkedTimerTaskId = null;
+        if (timerTaskSelect) timerTaskSelect.value = "none";
+    }
 }
 
-
-function updateTimerDisplay() {
-  const minutes = Math.floor(time / 60);
-  const seconds = time % 60;
-  if(timerElement) timerElement.textContent = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-
-  const totalInput = parseInt(timeInput.value);
-  const totalTime = isNaN(totalInput) || totalInput <= 0 ? 1 : totalInput * 60;
-
-  const percent = Math.max(0, Math.min(100, (time / totalTime) * 100));
-  const timerBar = document.getElementById("timerBar");
-  if (timerBar) timerBar.style.width = percent + "%";
+function populateTimerTaskSelect(tasks) {
+    if (!timerTaskSelect) return;
+    const currentValue = timerTaskSelect.value;
+    timerTaskSelect.innerHTML = '<option value="none">🔗 No task linked</option>';
+    tasks.filter(t => !t.is_done).forEach(task => {
+        const option = document.createElement("option");
+        option.value = task.id;
+        option.textContent = task.content;
+        timerTaskSelect.appendChild(option);
+    });
+    if (Array.from(timerTaskSelect.options).some(opt => opt.value == currentValue)) {
+        timerTaskSelect.value = currentValue;
+        linkedTimerTaskId = currentValue === "none" ? null : currentValue;
+    } else {
+        timerTaskSelect.value = "none";
+        linkedTimerTaskId = null;
+    }
 }
 
-function setTimer() {
-  const minutes = parseInt(timeInput.value);
-  if (!isNaN(minutes) && minutes > 0) {
-    time = minutes * 60;
-    updateTimerDisplay();
-    if (startButton) startButton.disabled = false;
-    if (stopButton) stopButton.disabled = true;
-    clearInterval(timerInterval);
-  }
+if (timerTaskSelect) {
+    timerTaskSelect.addEventListener("change", (e) => {
+        linkedTimerTaskId = e.target.value === "none" ? null : e.target.value;
+    });
 }
 
-function updateTimer() {
-  if (time <= 0) {
-    clearInterval(timerInterval);
-    timerFinished();
-    return;
-  }
-  updateTimerDisplay();
-  time--;
-}
+timerModeButtons.forEach(btn => {
+    btn.addEventListener("click", () => setTimerMode(btn.dataset.mode));
+});
 
-function startTimer() {
-  if (startButton) startButton.disabled = true;
-  if (stopButton) stopButton.disabled = false;
-  if(timerElement) timerElement.classList.add("active");
-  timerInterval = setInterval(updateTimer, 1000);
-}
-
-function stopTimer() {
-  if (startButton) startButton.disabled = false;
-  if (stopButton) stopButton.disabled = true;
-  if(timerElement) timerElement.classList.remove("active");
-  clearInterval(timerInterval);
-}
-
-// Helper to get today's date in YYYY-MM-DD format (used for display/comparison only)
 function getTodayDateString() {
     const today = new Date();
     const year = today.getFullYear();
@@ -1131,28 +1496,23 @@ function getTodayDateString() {
     return `${year}-${month}-${day}`;
 }
 
-// Function to schedule a single task notification
 function scheduleTaskNotification(task) {
-    // Only schedule if user is logged in, task has a due date, and is not done.
     if (!task.due_date || task.is_done) {
         clearScheduledNotification(task.id);
         return;
     }
 
-    clearScheduledNotification(task.id); // Clear any existing notification for this task
+    clearScheduledNotification(task.id); 
 
     const dueDateTime = new Date(task.due_date);
 
-    // If dueDateTime is invalid (e.g., only date was provided without time, or malformed)
     if (isNaN(dueDateTime.getTime())) {
         console.warn(`Invalid due_date for task ${task.id}: ${task.due_date}. Cannot schedule notification.`);
         return;
     }
 
-    // Default to 15 minutes before, or use the task's specified offset
     const notificationTimeOffset = task.notification_time !== null ? parseInt(task.notification_time, 10) : 15;
 
-    // Calculate the exact timestamp for the notification
     const notificationTimestamp = dueDateTime.getTime() - (notificationTimeOffset * 60 * 1000);
 
     const now = Date.now();
@@ -1164,12 +1524,9 @@ function scheduleTaskNotification(task) {
             const formattedDueTime = new Date(task.due_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const notificationMessage = `${task.content} at ${formattedDueTime}`;
 
-            // Only show in-app custom alert
             showCustomAlert(`🔔 ${notificationMessage}`);
 
-            // Play a notification sound
             try {
-                // Ensure you have a sound file at this path, e.g., assets/notification.mp3
                 const notificationSound = new Audio('./notification-sound-effect-372475.mp3');
                 notificationSound.play().catch(e => console.error("Error playing notification sound:", e));
             } catch (e) {
@@ -1205,7 +1562,6 @@ function clearAllScheduledNotifications() {
     Object.keys(notificationTimers).forEach(key => delete notificationTimers[key]);
 }
 
-// Variable to hold the currently dragged list item
 let draggedItem = null;
 
 function createTaskElement(task) {
@@ -1216,39 +1572,36 @@ function createTaskElement(task) {
     li.dataset.taskId = task.id;
     li.dataset.priority = task.priority || "Medium";
     li.dataset.position = task.position || 0;
-    li.dataset.createdAt = task.created_at; // Store creation date for sorting
-    li.dataset.goalId = task.goal_id || ""; // NEW: Store goal ID
+    li.dataset.createdAt = task.created_at; 
+    li.dataset.goalId = task.goal_id || ""; 
 
     if (task.is_done) {
         li.classList.add("finished");
     }
 
-    // Apply date-related classes (now considering full date-time)
     const taskDueDateTime = task.due_date ? new Date(task.due_date) : null;
     if (taskDueDateTime && !isNaN(taskDueDateTime.getTime())) {
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Normalize today to start of day
+        today.setHours(0, 0, 0, 0); 
 
         const taskDateOnly = new Date(taskDueDateTime);
-        taskDateOnly.setHours(0, 0, 0, 0); // Normalize task date to start of day
+        taskDateOnly.setHours(0, 0, 0, 0); 
 
         const diffTime = taskDateOnly.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        li.classList.remove("task-due-today", "task-overdue"); // Clear existing
-        if (diffDays < 0) { // Overdue
+        li.classList.remove("task-due-today", "task-overdue");
+        if (diffDays < 0) { 
             li.classList.add('overdue-task');
-        } else if (diffDays === 0) { // Due Today
+        } else if (diffDays === 0) { 
             li.classList.add('today-task');
-        } else { // Future
+        } else {
             li.classList.add('future-task');
         }
     } else {
         li.classList.add('no-due-date');
     }
 
-
-    // Checkbox
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = task.is_done || false;
@@ -1260,36 +1613,33 @@ function createTaskElement(task) {
       if (taskId) {
         await updateTask(taskId, { is_done: isChecked });
       }
-      // Reload tasks to re-render with updated completion status and apply filters/sorting
       await loadTasks(); 
     });
     li.appendChild(checkbox);
 
-    // Task Content
     const span = document.createElement("span");
     span.classList.add("task-text");
     span.innerHTML = marked.parse(task.content || "");
     span.setAttribute("data-raw", task.content || "");
     li.appendChild(span);
     
-    // NEW: Attachment Icon for task list item
     if (task.attachments && task.attachments.length > 0) {
         const attachmentIcon = document.createElement("span");
-        attachmentIcon.classList.add("attachment-icon"); // Add a class for styling
-        attachmentIcon.innerHTML = `🗂️`; // Paperclip icon
+        attachmentIcon.classList.add("attachment-icon"); 
+        attachmentIcon.innerHTML = `🗂️`; 
         attachmentIcon.title = "View attachments";
         attachmentIcon.style.cursor = "pointer";
-        attachmentIcon.addEventListener("click", async () => { // Made async to await signed URLs
+        attachmentIcon.addEventListener("click", async () => { 
             let attachmentListHtml = "<h3>Attachments:</h3><ul>";
-            for (const att of task.attachments) { // Use for...of for async operations
-                let attachmentUrl = att.url; // Default to stored URL (for guest mode base64 or public URLs)
-                if (currentUser && att.file_path) { // If logged in and file_path exists, generate signed URL
+            for (const att of task.attachments) { 
+                let attachmentUrl = att.url; 
+                if (currentUser && att.file_path) { 
                     const { data, error } = await supabase.storage
-                        .from('task-attachments') // Your bucket name
-                        .createSignedUrl(att.file_path, 60 * 60); // URL valid for 1 hour (adjust as needed)
+                        .from('task-attachments') 
+                        .createSignedUrl(att.file_path, 60 * 60); 
                     if (error) {
                         console.error("Error creating signed URL:", error.message);
-                        attachmentUrl = "#"; // Fallback if signed URL fails
+                        attachmentUrl = "#";
                         showCustomAlert("Failed to generate signed URL for " + att.name);
                     } else {
                         attachmentUrl = data.signedUrl;
@@ -1302,18 +1652,16 @@ function createTaskElement(task) {
         });
         li.appendChild(attachmentIcon);
     }
-    // NEW: Subtask Progress Display
     const subtaskProgressDisplay = document.createElement("span");
     subtaskProgressDisplay.classList.add("subtask-progress-display");
     if (task.subtasks && task.subtasks.length > 0) {
         const completedSubtasks = task.subtasks.filter(st => st.is_done).length;
         subtaskProgressDisplay.textContent = `✅ ${completedSubtasks}/${task.subtasks.length}`;
     } else {
-        subtaskProgressDisplay.textContent = ``; // No display if no subtasks
+        subtaskProgressDisplay.textContent = ``;
     }
     li.appendChild(subtaskProgressDisplay);
 
-    // NEW: Recurrence Label Display
     const recurrenceLabel = document.createElement("span");
     recurrenceLabel.classList.add("recurrence-label");
     if (task.recurrence_type && task.recurrence_type !== 'none') {
@@ -1348,21 +1696,18 @@ function createTaskElement(task) {
             goalLabel.title = `Linked to Goal: ${linkedGoal.title}`;
             goalLabel.style.cursor = "pointer";
             goalLabel.addEventListener("click", () => {
-                // When clicked, switch to goals section and filter by this goal
                 document.getElementById("goalsSection").style.display = "block";
-                document.getElementById("filterSortSection").style.display = "none";
-                document.getElementById("taskCountToday").style.display = "none";
-                document.getElementById("taskList").style.display = "none";
+                document.getElementById("tasksPanel").style.display = "none";
                 document.getElementById("toggleGoals").classList.add("active");
                 document.getElementById("toggleNotes").classList.remove("active");
 
-                document.getElementById("goalSearchInput").value = ""; // Clear search
-                document.getElementById("goalStatusFilter").value = "all"; // Clear status filter
-                document.getElementById("goalSortOrder").value = "dueDateAsc"; // Default sort
-                filterGoals(); // Re-render goals
+                document.getElementById("goalSearchInput").value = ""; 
+                document.getElementById("goalStatusFilter").value = "all"; 
+                document.getElementById("goalSortOrder").value = "dueDateAsc"; 
+                filterGoals(); 
             });
         } else {
-            goalLabel.textContent = `🎯 Unlinked Goal`; // If goal not found
+            goalLabel.textContent = `🎯 Unlinked Goal`;
             goalLabel.title = `Linked to unknown goal ID: ${task.goal_id}`;
         }
     } else {
@@ -1370,7 +1715,6 @@ function createTaskElement(task) {
     }
     li.appendChild(goalLabel);
     
-    // Notification Time Display
     const notificationTimeDisplay = document.createElement("span");
     notificationTimeDisplay.classList.add("notification-time-display");
     if (task.notification_time !== null && task.notification_time > 0 && task.due_date) {
@@ -1385,9 +1729,8 @@ function createTaskElement(task) {
     } else {
         notificationTimeDisplay.textContent = ``;
     }
-    li.appendChild(notificationTimeDisplay); // Appended after dueDateDisplay
+    li.appendChild(notificationTimeDisplay); 
 
-    // Due Date Display
     const dueDateDisplay = document.createElement("span");
     dueDateDisplay.classList.add("due-date-display");
     if (taskDueDateTime && !isNaN(taskDueDateTime.getTime())) {
@@ -1400,9 +1743,8 @@ function createTaskElement(task) {
     } else {
         dueDateDisplay.textContent = '';
     }
-    li.appendChild(dueDateDisplay); // Appended after priorityLabel
+    li.appendChild(dueDateDisplay); 
 
-    // Category label - MOVED HERE
     const categoryLabel = document.createElement("span");
     categoryLabel.classList.add("category-label");
     categoryLabel.textContent = `🏷️ ${task.category || "Personal"}`;
@@ -1414,12 +1756,11 @@ function createTaskElement(task) {
       const categoryFilter = document.getElementById("categoryFilter");
       if (categoryFilter) {
         categoryFilter.value = task.category || "all";
-        filterTasks(); // Re-run filter with the selected category
+        filterTasks(); 
       }
     });
-    li.appendChild(categoryLabel); // Appended after span
+    li.appendChild(categoryLabel);
 
-    // Priority label - MOVED HERE
     const priorityLabel = document.createElement("span");
     priorityLabel.classList.add("priority-label");
     priorityLabel.textContent = `⚡ ${task.priority || "Medium"}`;
@@ -1430,50 +1771,43 @@ function createTaskElement(task) {
       const priorityFilter = document.getElementById("priorityFilter");
       if (priorityFilter) {
         priorityFilter.value = task.priority || "all";
-        filterTasks(); // Re-run filter with the selected priority
+        filterTasks(); 
       }
     });
-    li.appendChild(priorityLabel); // Appended after categoryLabel
+    li.appendChild(priorityLabel); 
 
-    
-    // Task Actions container
     const taskActions = document.createElement("div");
     taskActions.classList.add("task-actions");
 
-    // Edit button - Now opens modal
     const editBtn = document.createElement("button");
     editBtn.classList.add("edit-button");
     editBtn.style.cursor = "pointer";
     editBtn.title = "Edit task";
-    editBtn.innerHTML = `✏️`; // SVG for edit icon
+    editBtn.innerHTML = EDIT_ICON_SVG;
     editBtn.setAttribute('aria-label', 'Edit task');
     editBtn.addEventListener("click", () => showEditModal(task)); // Call showEditModal
     taskActions.appendChild(editBtn);
 
     // Delete button
     const deleteBtn = document.createElement("button");
-    deleteBtn.textContent = ""; // Text removed, using SVG
+    deleteBtn.textContent = "";
     deleteBtn.classList.add("delete-button");
-    deleteBtn.innerHTML = `🗑️`; // SVG for delete icon
+    deleteBtn.innerHTML = DELETE_ICON_SVG;
+    deleteBtn.title = "Delete task";
+    deleteBtn.setAttribute('aria-label', 'Delete task');
     deleteBtn.addEventListener("click", async () => {
       showCustomConfirm("Are you sure you want to delete this task?", async () => {
           const taskId = li.dataset.taskId;
           await deleteTask(taskId);
-          // Instead of removing li directly, reload tasks to ensure search/filter state is consistent
           await loadTasks(); 
       });
     });
     taskActions.appendChild(deleteBtn);
 
-
-    // Append Task Actions
     li.appendChild(taskActions);
 
-
-    // Subtasks section
     const subtasksContainer = document.createElement("div");
     subtasksContainer.classList.add("subtasks-container");
-    // Initially hide subtasks unless previously expanded
     if (expandedTaskIds.has(task.id)) {
         subtasksContainer.style.display = "block";
     } else {
@@ -1496,7 +1830,7 @@ function createTaskElement(task) {
         if (content) {
             await addSubTask(task.id, content);
             subtaskInput.value = "";
-            await loadTasks(); // Reload to update UI with new subtask
+            await loadTasks();
         } else {
             showCustomAlert("Sub-task content cannot be empty.");
         }
@@ -1507,7 +1841,7 @@ function createTaskElement(task) {
             if (content) {
                 await addSubTask(task.id, content);
                 subtaskInput.value = "";
-                await loadTasks(); // Reload to update UI with new subtask
+                await loadTasks(); 
             } else {
                 showCustomAlert("Sub-task content cannot be empty.");
             }
@@ -1524,21 +1858,18 @@ function createTaskElement(task) {
 
     li.appendChild(subtasksContainer);
 
-    // Expand/Collapse button for subtasks
     const toggleSubtasksBtn = document.createElement("button");
     toggleSubtasksBtn.classList.add("toggle-subtasks-button");
-    // Set initial icon based on expanded state
-    // Use a single SVG path that can be rotated by CSS
     toggleSubtasksBtn.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6">
             <path fill-rule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clip-rule="evenodd" />
         </svg>
-    `; // This is the down arrow SVG
+    `;
 
     if (expandedTaskIds.has(task.id)) {
-        toggleSubtasksBtn.classList.add("expanded"); // Add 'expanded' class if it should be expanded
+        toggleSubtasksBtn.classList.add("expanded"); 
     } else {
-        toggleSubtasksBtn.classList.remove("expanded"); // Ensure 'expanded' class is not present
+        toggleSubtasksBtn.classList.remove("expanded");
     }
 
     toggleSubtasksBtn.title = "Toggle subtasks";
@@ -1552,12 +1883,10 @@ function createTaskElement(task) {
             expandedTaskIds.add(task.id);
         }
 
-        // ONLY toggle the class, do NOT re-set innerHTML
         toggleSubtasksBtn.classList.toggle("expanded", !isExpanded);
     });
-    li.insertBefore(toggleSubtasksBtn, li.querySelector(".task-actions")); // Insert before task actions
+    li.insertBefore(toggleSubtasksBtn, li.querySelector(".task-actions")); 
 
-    // Render existing subtasks
     if (task.subtasks && task.subtasks.length > 0) {
         task.subtasks.forEach(subtask => {
             const subtaskLi = createSubTaskElement(task.id, subtask);
@@ -1566,18 +1895,17 @@ function createTaskElement(task) {
     }
 
 
-    // Drag & drop handlers (existing, moved to end for clarity)
+
     li.addEventListener("dragstart", e => {
       li.classList.add("dragging");
-      draggedItem = li; // Store the dragged item
+      draggedItem = li; 
       e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", null); // Required for Firefox
+      e.dataTransfer.setData("text/plain", null); 
     });
 
     li.addEventListener("dragend", () => {
       li.classList.remove("dragging");
-      draggedItem = null; // Clear the dragged item reference
-      // Remove 'dragover' from all elements in case it was left on one
+      draggedItem = null; 
       [...taskList.children].forEach(item => {
           item.classList.remove("dragover-top", "dragover-bottom");
           item.style.borderTop = "";
@@ -1587,11 +1915,10 @@ function createTaskElement(task) {
     });
 
     li.addEventListener("dragover", e => {
-      e.preventDefault(); // Allow drop
-      if (!draggedItem || draggedItem === li) return; // Don't do anything if no item is dragged or if dragging over itself
+      e.preventDefault(); 
+      if (!draggedItem || draggedItem === li) return;
 
-      // Clear all previous dragover indicators efficiently
-      // We only clear if a new item is being hovered, not on every single pixel movement
+
       const currentDragoverTop = taskList.querySelector(".dragover-top");
       if (currentDragoverTop && currentDragoverTop !== li) {
           currentDragoverTop.classList.remove("dragover-top");
@@ -1606,22 +1933,20 @@ function createTaskElement(task) {
       const rect = li.getBoundingClientRect();
       const offset = e.clientY - rect.top;
 
-      // Determine if hovering over the top or bottom half to indicate insertion point
       if (offset < rect.height / 2) {
-        li.classList.add("dragover-top"); // Add class for top insertion
-        li.style.borderTop = "2px solid var(--highlight-color)"; // Keep for immediate visual
-        li.style.borderBottom = ""; // Ensure bottom border is clear
+        li.classList.add("dragover-top");
+        li.style.borderTop = "2px solid var(--highlight-color)";
+        li.style.borderBottom = ""; 
       } else {
-        li.classList.add("dragover-bottom"); // Add class for bottom insertion
-        li.style.borderBottom = "2px solid var(--highlight-color)"; // Keep for immediate visual
-        li.style.top = ""; // Ensure top border is clear
+        li.classList.add("dragover-bottom"); 
+        li.style.borderBottom = "2px solid var(--highlight-color)";
+        li.style.top = ""; 
       }
     });
 
     li.addEventListener("dragleave", () => {
-      // Only remove dragover if it's not the currently dragged item itself
       if (li !== draggedItem) {
-          li.classList.remove("dragover-top", "dragover-bottom"); // Remove specific classes
+          li.classList.remove("dragover-top", "dragover-bottom");
           li.style.borderTop = "";
           li.style.bottom = "";
       }
@@ -1631,7 +1956,6 @@ function createTaskElement(task) {
       e.preventDefault();
       if (!draggedItem || draggedItem === li) return;
 
-      // Clear dragover styles from the dropped-on element
       li.classList.remove("dragover-top", "dragover-bottom");
       li.style.borderTop = "";
       li.style.bottom = "";
@@ -1639,20 +1963,16 @@ function createTaskElement(task) {
       const rect = li.getBoundingClientRect();
       const offset = e.clientY - rect.top;
 
-      // Insert the dragged item before or after the target item
       if (offset < rect.height / 2) {
         taskList.insertBefore(draggedItem, li);
       } else {
         taskList.insertBefore(draggedItem, li.nextSibling);
       }
-      // updateTaskPositionsInDB will be called in dragend,
-      // which fires after drop.
     });
     
     return li;
   }
 
-// NEW: Function to create a sub-task element
 function createSubTaskElement(parentTaskId, subtask) {
     const li = document.createElement("li");
     li.classList.add("subtask-item");
@@ -1664,7 +1984,6 @@ function createSubTaskElement(parentTaskId, subtask) {
     checkbox.checked = subtask.is_done || false;
     checkbox.addEventListener("change", async () => {
         await toggleSubTask(parentTaskId, subtask.id, checkbox.checked);
-        // We only need to update the UI for this specific subtask
         const subtaskTextSpan = li.querySelector(".subtask-text");
         if (subtaskTextSpan) {
             if (checkbox.checked) {
@@ -1673,7 +1992,6 @@ function createSubTaskElement(parentTaskId, subtask) {
                 subtaskTextSpan.classList.remove("finished");
             }
         }
-        // Update the parent task's subtask progress display
         const parentTaskElement = document.querySelector(`li[data-task-id="${parentTaskId}"]`);
         if (parentTaskElement) {
             const parentTask = allTasks.find(t => t.id == parentTaskId);
@@ -1685,7 +2003,6 @@ function createSubTaskElement(parentTaskId, subtask) {
                 }
             }
         }
-        // NEW: If subtask completion changes, update goal progress
         await loadGoals();
     });
     li.appendChild(checkbox);
@@ -1700,7 +2017,9 @@ function createSubTaskElement(parentTaskId, subtask) {
 
     const deleteBtn = document.createElement("button");
     deleteBtn.classList.add("delete-button", "subtask-delete-button");
-    deleteBtn.innerHTML = `🗑️`;
+    deleteBtn.innerHTML = DELETE_ICON_SVG;
+    deleteBtn.title = "Delete sub-task";
+    deleteBtn.setAttribute('aria-label', 'Delete sub-task');
     deleteBtn.addEventListener("click", async () => {
         showCustomConfirm("Are you sure you want to delete this sub-task?", async () => {
             await deleteSubTask(parentTaskId, subtask.id);
@@ -1712,7 +2031,6 @@ function createSubTaskElement(parentTaskId, subtask) {
     return li;
 }
 
-// NEW: Function to add a sub-task to a main task
 async function addSubTask(parentTaskId, content) {
     const parentTask = allTasks.find(task => task.id == parentTaskId);
     if (!parentTask) {
@@ -1721,22 +2039,19 @@ async function addSubTask(parentTaskId, content) {
     }
 
     const newSubtask = {
-        id: crypto.randomUUID(), // Use crypto.randomUUID() for unique IDs
+        id: crypto.randomUUID(), 
         content: content,
         is_done: false,
     };
 
-    // Ensure subtasks array exists
     if (!parentTask.subtasks) {
         parentTask.subtasks = [];
     }
     parentTask.subtasks.push(newSubtask);
 
-    // Update the main task in DB/Local Storage
     await updateTask(parentTaskId, { subtasks: parentTask.subtasks });
 }
 
-// NEW: Function to toggle a sub-task's completion status
 async function toggleSubTask(parentTaskId, subtaskId, isDone) {
     const parentTask = allTasks.find(task => task.id == parentTaskId);
     if (!parentTask || !parentTask.subtasks) {
@@ -1751,7 +2066,6 @@ async function toggleSubTask(parentTaskId, subtaskId, isDone) {
     }
 }
 
-// NEW: Function to delete a sub-task
 async function deleteSubTask(parentTaskId, subtaskId) {
     const parentTask = allTasks.find(task => task.id == parentTaskId);
     if (!parentTask || !parentTask.subtasks) {
@@ -1763,20 +2077,17 @@ async function deleteSubTask(parentTaskId, subtaskId) {
     await updateTask(parentTaskId, { subtasks: parentTask.subtasks });
 }
 
-
-// Global array to hold files selected for a new task
 let newSelectedFiles = [];
 
 async function addTaskFromInput() {
     const taskInput = document.getElementById("taskInput");
     const categorySelect = document.getElementById("categorySelect");
     const prioritySelect = document.getElementById("prioritySelect");
-    const dueDateInput = document.getElementById("dueDate"); // Updated ID
-    const dueTimeInput = document.getElementById("dueTime"); // Updated ID
-    const newAttachmentsDisplay = document.getElementById("newAttachmentsDisplay"); // Get the display area
-    const goalSelect = document.getElementById("goalSelect"); // NEW: Goal select
+    const dueDateInput = document.getElementById("dueDate"); 
+    const dueTimeInput = document.getElementById("dueTime"); 
+    const newAttachmentsDisplay = document.getElementById("newAttachmentsDisplay"); 
+    const goalSelect = document.getElementById("goalSelect"); 
 
-    // NEW: Recurrence fields
     const recurrenceTypeSelect = document.getElementById("recurrenceType");
     const recurrenceDetailsContainer = document.getElementById("recurrenceDetails");
 
@@ -1788,47 +2099,41 @@ async function addTaskFromInput() {
 
     const category = categorySelect.value;
     const priority = prioritySelect.value;
-    const goalId = goalSelect.value === "none" ? null : goalSelect.value; // NEW: Get selected goal ID
+    const goalId = goalSelect.value === "none" ? null : goalSelect.value; 
 
-    // Combine date and time into a single ISO string for due_date
     let dueDateTime = null;
     const datePart = dueDateInput.value;
     const timePart = dueTimeInput.value;
 
     if (datePart) {
-        // Construct a string that Date() will interpret as LOCAL time
         const combinedLocalDateTimeString = `${datePart}T${timePart || '00:00'}:00`;
         const localDateObj = new Date(combinedLocalDateTimeString);
 
         if (!isNaN(localDateObj.getTime())) {
-            // Convert this local Date object to its UTC ISO string for storage
             dueDateTime = localDateObj.toISOString();
         } else {
             console.error("addTaskFromInput - Invalid date/time parsed:", combinedLocalDateTimeString);
         }
     }
 
-    // NEW: Get recurrence data
     const recurrenceType = recurrenceTypeSelect.value;
     let recurrenceDetails = {};
     if (recurrenceType !== 'none') {
         recurrenceDetails = getRecurrenceDetails(recurrenceType, recurrenceDetailsContainer);
     }
 
-    // Handle attachments for new task using newSelectedFiles
     const attachments = [];
     // For new tasks, we first add the task without attachments, then upload attachments
     // and update the task with attachment info. This is because Supabase Storage
     // paths often rely on a task ID.
     // So, we'll store the files in a temporary array and handle them after task creation.
     const filesToUploadAfterTaskCreation = [...newSelectedFiles];
-    newSelectedFiles = []; // Clear the global array after copying
+    newSelectedFiles = [];
 
-    const newTask = await addTask(taskText, category, priority, dueDateTime, null, [], recurrenceType, recurrenceDetails, goalId); // Pass empty attachments initially, and goalId
+    const newTask = await addTask(taskText, category, priority, dueDateTime, null, [], recurrenceType, recurrenceDetails, goalId);
 
     if (!newTask) return;
 
-    // Now upload attachments using the newly created newTask.id
     const uploadedAttachments = [];
     for (const file of filesToUploadAfterTaskCreation) {
         const attachmentInfo = await handleFileUpload(newTask.id, file); // Pass the real taskId
@@ -1837,7 +2142,6 @@ async function addTaskFromInput() {
         }
     }
     
-    // Update the newly created task with the uploaded attachment info
     if (uploadedAttachments.length > 0) {
         await updateTask(newTask.id, { attachments: uploadedAttachments });
     }
@@ -1848,20 +2152,18 @@ async function addTaskFromInput() {
     prioritySelect.value = "Medium";
     dueDateInput.value = "";
     dueTimeInput.value = "";
-    recurrenceTypeSelect.value = "none"; // Reset recurrence
-    renderRecurrenceDetails('none', recurrenceDetailsContainer); // Clear recurrence details display
-    goalSelect.value = "none"; // NEW: Reset goal select
+    recurrenceTypeSelect.value = "none"; 
+    renderRecurrenceDetails('none', recurrenceDetailsContainer); 
+    goalSelect.value = "none"; 
     
-    // Clear selected files and update display for new task form
     newAttachmentsDisplay.innerHTML = ''; 
 
     updateTaskCounter();
-    await loadTasks(); // Reload tasks to ensure new task is rendered and sorted
-    await loadGoals(); // NEW: Reload goals to update progress
+    await loadTasks(); 
+    await loadGoals(); 
 }
 
 
-// --- Custom Alert/Confirm Modals (replacing native alert/confirm) ---
 function showCustomAlert(message) {
     const modal = document.createElement('div');
     modal.classList.add('custom-modal');
@@ -1956,9 +2258,8 @@ function showCustomPrompt(message, onConfirm, defaultValue = '') {
     });
 }
 
-// --- NEW: Task Edit Modal Logic ---
 const editTaskModal = document.getElementById("editTaskModal");
-const closeEditModalButton = document.getElementById("closeEditModal"); // This button doesn't exist in HTML, using cancelEditButton
+const closeEditModalButton = document.getElementById("closeEditModal"); 
 const saveEditButton = document.getElementById("saveEditButton");
 const cancelEditButton = document.getElementById("cancelEditButton");
 
@@ -1967,33 +2268,29 @@ const editTaskContent = document.getElementById("editTaskContent");
 const editCategorySelect = document.getElementById("editCategorySelect");
 const editPrioritySelect = document.getElementById("editPrioritySelect");
 const editDueDate = document.getElementById("editDueDate");
-const editDueTime = document.getElementById("editDueTime"); // New ID for due time in modal
-const editNotificationOffset = document.getElementById("editNotificationOffset"); // New ID for notification offset in modal
-const editAttachmentInput = document.getElementById("editAttachmentInput"); // NEW attachment input for edit modal
-const currentAttachmentsDisplay = document.getElementById("currentAttachmentsDisplay"); // NEW attachments display container
-const editGoalSelect = document.getElementById("editGoalSelect"); // NEW: Goal select for edit modal
-
-// NEW: Recurrence fields for Edit Task Modal
+const editDueTime = document.getElementById("editDueTime");
+const editNotificationOffset = document.getElementById("editNotificationOffset"); 
+const editAttachmentInput = document.getElementById("editAttachmentInput"); 
+const currentAttachmentsDisplay = document.getElementById("currentAttachmentsDisplay"); 
+const editGoalSelect = document.getElementById("editGoalSelect"); 
 const editRecurrenceTypeSelect = document.getElementById("editRecurrenceType");
 const editRecurrenceDetailsContainer = document.getElementById("editRecurrenceDetails");
 
 
-let attachmentsToKeep = []; // Global to track attachments in edit modal
+let attachmentsToKeep = [];
 
 function showEditModal(task) {
     editTaskId.value = task.id;
     editTaskContent.value = task.content;
     
-    // Ensure the category and priority options exist in the select boxes
     ensureOptionExists(editCategorySelect, task.category);
     ensureOptionExists(editPrioritySelect, task.priority);
 
     editCategorySelect.value = task.category || "Personal";
-    editPrioritySelect.value = "Medium"; // Default to Medium if not set
+    editPrioritySelect.value = "Medium";
     if (task.priority) {
         editPrioritySelect.value = task.priority;
     } else {
-        // If the task has no priority, try to select 'Medium' or the first available option
         const mediumOption = Array.from(editPrioritySelect.options).find(opt => opt.value === "Medium");
         if (mediumOption) {
             editPrioritySelect.value = "Medium";
@@ -2002,20 +2299,16 @@ function showEditModal(task) {
         }
     }
 
-    // Format due_date for input[type="date"] and due_time for input[type="time"]
  if (task.due_date) {
-    const dueDateObj = new Date(task.due_date); // This correctly parses the UTC ISO string
+    const dueDateObj = new Date(task.due_date); 
     if (!isNaN(dueDateObj.getTime())) {
-        // Correctly get local date components for the date input
         const year = dueDateObj.getFullYear();
-        const month = String(dueDateObj.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed, so add 1
+        const month = String(dueDateObj.getMonth() + 1).padStart(2, '0');
         const day = String(dueDateObj.getDate()).padStart(2, '0');
-        editDueDate.value = `${year}-${month}-${day}`; // Format as YYYY-MM-DD (local date)
-
-        // Get local hours and minutes for the time input (this part was already correct)
+        editDueDate.value = `${year}-${month}-${day}`; 
         const localHours = String(dueDateObj.getHours()).padStart(2, '0');
         const localMinutes = String(dueDateObj.getMinutes()).padStart(2, '0');
-        editDueTime.value = `${localHours}:${localMinutes}`; // Format as HH:MM
+        editDueTime.value = `${localHours}:${localMinutes}`;
     } else {
         editDueDate.value = '';
         editDueTime.value = '';
@@ -2025,18 +2318,14 @@ function showEditModal(task) {
     editDueTime.value = '';
 }
 
-    // Set notification offset
     editNotificationOffset.value = task.notification_time !== null ? task.notification_time : '';
 
-    // NEW: Set recurrence type and details for edit modal
     editRecurrenceTypeSelect.value = task.recurrence_type || 'none';
     renderRecurrenceDetails(editRecurrenceTypeSelect.value, editRecurrenceDetailsContainer, task.recurrence_details);
 
-    // NEW: Set goal selection for edit modal
     editGoalSelect.value = task.goal_id || 'none';
 
 
-    // Handle attachments in edit modal
     attachmentsToKeep = [...(task.attachments || [])]; // Initialize with existing attachments
     renderAttachments(attachmentsToKeep, currentAttachmentsDisplay, task.id, true); // Render existing, allow removal
 
@@ -2050,7 +2339,6 @@ function ensureOptionExists(selectElement, value) {
             const newOption = document.createElement("option");
             newOption.value = value;
             newOption.textContent = value;
-            // Insert before the "__custom__" option
             selectElement.insertBefore(newOption, selectElement.lastElementChild);
         }
     }
@@ -2059,9 +2347,9 @@ function ensureOptionExists(selectElement, value) {
 
 function hideEditModal() {
     editTaskModal.style.display = "none";
-    editAttachmentInput.value = ""; // Clear file input when modal closes
-    currentAttachmentsDisplay.innerHTML = ""; // Clear displayed attachments
-    attachmentsToKeep = []; // Reset attachments to keep
+    editAttachmentInput.value = ""; 
+    currentAttachmentsDisplay.innerHTML = ""; 
+    attachmentsToKeep = []; 
 }
 
 async function saveEditedTask() {
@@ -2069,12 +2357,11 @@ async function saveEditedTask() {
     const content = editTaskContent.value.trim();
     const category = editCategorySelect.value;
     const priority = editPrioritySelect.value;
-    const dueDate = editDueDate.value; // YYYY-MM-DD string
-    const dueTime = editDueTime.value; // HH:MM string
+    const dueDate = editDueDate.value; 
+    const dueTime = editDueTime.value; 
     const notificationOffset = editNotificationOffset.value ? parseInt(editNotificationOffset.value, 10) : null;
-    const goalId = editGoalSelect.value === "none" ? null : editGoalSelect.value; // NEW: Get selected goal ID
+    const goalId = editGoalSelect.value === "none" ? null : editGoalSelect.value; 
 
-    // NEW: Get recurrence data from edit modal
     const recurrenceType = editRecurrenceTypeSelect.value;
     let recurrenceDetails = {};
     if (recurrenceType !== 'none') {
@@ -2088,23 +2375,20 @@ async function saveEditedTask() {
 
     let updatedDueDateTime = null;
     if (dueDate) {
-        // Combine date and time to form the full due_date ISO string
-        // Use the dueTime from the modal, default to 00:00 if not set
+
         const combinedLocalDateTimeString = `${dueDate}T${dueTime || '00:00'}:00`;
         const localDateObj = new Date(combinedLocalDateTimeString);
 
         if (!isNaN(localDateObj.getTime())) {
-            updatedDueDateTime = localDateObj.toISOString(); // Convert local Date object to UTC ISO string for storage
+            updatedDueDateTime = localDateObj.toISOString();
         } else {
             console.error("saveEditedTask - Invalid date/time parsed:", combinedLocalDateTimeString);
         }
     }
 
-    // Process new attachments from the edit modal's file input
     const newAttachments = [];
     if (editAttachmentInput.files.length > 0) {
         for (const file of editAttachmentInput.files) {
-            // Pass the taskId to handleFileUpload for Supabase Storage path
             const attachmentInfo = await handleFileUpload(taskId, file); 
             if (attachmentInfo) {
                 newAttachments.push(attachmentInfo);
@@ -2112,22 +2396,20 @@ async function saveEditedTask() {
         }
     }
 
-    // Combine attachments to keep with newly uploaded ones
     const finalAttachments = [...attachmentsToKeep, ...newAttachments];
 
     let updates = {
         content: content,
         category: category,
         priority: priority,
-        due_date: updatedDueDateTime, // This will be null if no date is set
-        notification_time: notificationOffset, // This will be null if no offset is set
-        attachments: finalAttachments, // Update with the combined attachments
-        recurrence_type: recurrenceType, // NEW
-        recurrence_details: recurrenceDetails, // NEW
-        goal_id: goalId, // NEW: Include goal_id
+        due_date: updatedDueDateTime,
+        notification_time: notificationOffset, 
+        attachments: finalAttachments, 
+        recurrence_type: recurrenceType, 
+        recurrence_details: recurrenceDetails, 
+        goal_id: goalId, 
     };
 
-    // If recurrence type changed or due date changed, recalculate next_occurrence_date
     const currentTaskInAllTasks = allTasks.find(t => t.id == taskId);
     if (currentTaskInAllTasks && (currentTaskInAllTasks.recurrence_type !== recurrenceType || currentTaskInAllTasks.due_date !== updatedDueDateTime)) {
         if (recurrenceType !== 'none' && updatedDueDateTime) {
@@ -2139,8 +2421,8 @@ async function saveEditedTask() {
 
 
     try {
-        await updateTask(taskId, updates); // Use the existing updateTask function
-        await loadTasks(); // Reload tasks to reflect changes
+        await updateTask(taskId, updates);
+        await loadTasks();
         hideEditModal();
         showCustomAlert("Task updated successfully!");
     } catch (error) {
@@ -2157,15 +2439,14 @@ async function saveEditedTask() {
  */
 async function handleFileUpload(taskId, file) {
     if (currentUser) {
-        // Define the path in your storage bucket: user_id/task_id/file_name
-        const filePath = `${currentUser.id}/${taskId || 'temp'}/${Date.now()}-${file.name}`; // Use 'temp' if taskId is not yet available (for new tasks)
+        const filePath = `${currentUser.id}/${taskId || 'temp'}/${Date.now()}-${file.name}`; 
 
         try {
             const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('task-attachments') // Replace with your actual bucket name
+                .from('task-attachments') 
                 .upload(filePath, file, {
                     cacheControl: '3600',
-                    upsert: false // Set to true if you want to overwrite existing files with the same path
+                    upsert: false 
                 });
 
             if (uploadError) {
@@ -2174,29 +2455,24 @@ async function handleFileUpload(taskId, file) {
                 return null;
             }
 
-            // --- CHANGE START ---
-            // Instead of getPublicUrl, use createSignedUrl for private buckets
-            // This assumes 'task-attachments' bucket is private and requires authentication for access.
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-                .from('task-attachments') // Your bucket name
-                .createSignedUrl(uploadData.path, 60 * 60 * 24 * 7); // URL valid for 7 days (adjust as needed)
+                .from('task-attachments') 
+                .createSignedUrl(uploadData.path, 60 * 60 * 24 * 7); 
 
             if (signedUrlError) {
                 console.error("Error creating signed URL after upload:", signedUrlError.message);
                 showCustomAlert("Failed to generate signed URL for uploaded file.");
-                // Optionally, delete the uploaded file if signed URL generation fails
                 await supabase.storage.from('task-attachments').remove([uploadData.path]);
                 return null;
             }
 
             return { 
-                id: crypto.randomUUID(), // Assign a unique ID for the attachment itself
+                id: crypto.randomUUID(),
                 name: file.name, 
-                url: signedUrlData.signedUrl, // Store the signed URL
+                url: signedUrlData.signedUrl, 
                 type: file.type,
-                file_path: uploadData.path // Store the path for future signed URL generation and deletion
+                file_path: uploadData.path 
             };
-            // --- CHANGE END ---
 
         } catch (e) {
             console.error("Error during Supabase file upload process:", e);
@@ -2205,18 +2481,17 @@ async function handleFileUpload(taskId, file) {
         }
 
     } else {
-        // Guest mode: Store as Base64 (WARNING: Not suitable for large files! Not persistent across sessions/browsers)
         console.warn("Guest mode: Files are stored as Base64 data URLs in local storage. They are not uploaded to a server and will be lost if local storage is cleared.");
         showCustomAlert("Attachments in Guest Mode are stored locally and are not persistent. Log in for full attachment functionality.");
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 resolve({
-                    id: crypto.randomUUID(), // Assign a unique ID for guest mode attachments
+                    id: crypto.randomUUID(), 
                     name: file.name,
-                    url: e.target.result, // Base64 data URL
+                    url: e.target.result, 
                     type: file.type,
-                    file_path: null // No file path for guest mode Base64
+                    file_path: null 
                 });
             };
             reader.onerror = (e) => {
@@ -2237,34 +2512,30 @@ async function handleFileUpload(taskId, file) {
  * @param {boolean} editable If true, includes a remove button for each attachment.
  */
 function renderAttachments(attachments, container, taskId, editable) {
-    container.innerHTML = ''; // Clear previous attachments
+    container.innerHTML = '';
     attachments.forEach(attachment => {
         const attachmentItem = document.createElement('span');
         attachmentItem.classList.add('attachment-item');
 
         const link = document.createElement('a');
-        // For display, we will generate a signed URL on the fly if file_path exists and user is logged in
-        // Otherwise, use the stored URL (which could be a Base64 for guest mode)
-        link.href = "#"; // Default to a non-functional link until signed URL is generated
+        link.href = "#";
         link.textContent = attachment.name;
-        link.target = "_blank"; // Open in new tab
-        link.rel = "noopener noreferrer"; // Security best practice
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
 
-        // Event listener to generate signed URL when clicked
         link.addEventListener('click', async (e) => {
-            e.preventDefault(); // Prevent default link behavior
+            e.preventDefault(); 
             if (currentUser && attachment.file_path) {
                 const { data, error } = await supabase.storage
-                    .from('task-attachments') // Your bucket name
-                    .createSignedUrl(attachment.file_path, 60 * 60); // URL valid for 1 hour
+                    .from('task-attachments') 
+                    .createSignedUrl(attachment.file_path, 60 * 60);
                 if (error) {
                     console.error("Error creating signed URL for display:", error.message);
                     showCustomAlert("Failed to open file: " + attachment.name + ". Please try again.");
                 } else {
-                    window.open(data.signedUrl, '_blank'); // Open the signed URL in a new tab
+                    window.open(data.signedUrl, '_blank');
                 }
             } else if (attachment.url) {
-                // For guest mode (Base64 URL) or if file_path is missing, use the stored URL
                 window.open(attachment.url, '_blank');
             } else {
                 showCustomAlert("Cannot open attachment. No valid URL or file path found.");
@@ -2279,7 +2550,6 @@ function renderAttachments(attachments, container, taskId, editable) {
             removeBtn.textContent = 'x';
             removeBtn.title = `Remove ${attachment.name}`;
             removeBtn.addEventListener('click', () => {
-                // Pass file_path for Supabase deletion, and attachment ID for guest mode if needed
                 removeAttachment(taskId, attachment.id, attachment.file_path); 
             });
             attachmentItem.appendChild(removeBtn);
@@ -2305,39 +2575,32 @@ async function removeAttachment(taskId, attachmentId, filePath) {
         let updatedAttachments = [];
 
         if (currentUser && filePath) {
-            // Logged-in user: Attempt to delete from Supabase Storage
             try {
                 const { error: storageError } = await supabase.storage
-                    .from('task-attachments') // Replace with your actual bucket name
+                    .from('task-attachments')
                     .remove([filePath]);
 
                 if (storageError) {
                     console.error("Error deleting file from Supabase Storage:", storageError.message);
                     showCustomAlert("Failed to delete file from storage: " + storageError.message);
-                    // Even if storage deletion fails, we might still remove from DB to avoid broken links
                 }
             } catch (e) {
                 console.error("Error during Supabase Storage deletion process:", e);
                 showCustomAlert("An error occurred during file deletion from storage.");
             }
-            // Filter out the attachment based on file_path (more robust for Supabase)
             updatedAttachments = task.attachments.filter(att => att.file_path !== filePath);
         } else {
-            // Guest mode: Filter out the attachment based on ID
             updatedAttachments = task.attachments.filter(att => att.id !== attachmentId);
         }
 
         await updateTask(taskId, { attachments: updatedAttachments });
-        // Update the `attachmentsToKeep` array in the modal if it's open
         attachmentsToKeep = updatedAttachments;
         renderAttachments(attachmentsToKeep, currentAttachmentsDisplay, taskId, true); // Re-render attachments in modal
-        await loadTasks(); // Reload main task list to reflect changes
+        await loadTasks(); 
         showCustomAlert("Attachment removed.");
     });
 }
 
-
-// --- Filter and Sort Functionality ---
 const categoryFilter = document.getElementById("categoryFilter");
 const priorityFilter = document.getElementById("priorityFilter");
 const sortOrder = document.getElementById("sortOrder");
@@ -2347,15 +2610,14 @@ const goalFilter = document.getElementById("goalFilter"); // NEW: Goal filter fo
 
 
 function populateCategoryFilter(tasks) {
-    const categories = new Set(tasks.map(task => task.category).filter(Boolean)); // Get unique categories
-    categoryFilter.innerHTML = '<option value="all">All Categories</option>'; // Reset
+    const categories = new Set(tasks.map(task => task.category).filter(Boolean)); 
+    categoryFilter.innerHTML = '<option value="all">All Categories</option>'; 
     categories.forEach(cat => {
         const option = document.createElement('option');
         option.value = cat;
         option.textContent = cat;
         categoryFilter.appendChild(option);
     });
-    // Restore previous selection if it still exists
     const currentCategory = categoryFilter.dataset.currentValue || 'all';
     if (Array.from(categoryFilter.options).some(opt => opt.value === currentCategory)) {
         categoryFilter.value = currentCategory;
@@ -2365,9 +2627,8 @@ function populateCategoryFilter(tasks) {
 }
 
 function populatePriorityFilter(tasks) {
-    const priorities = new Set(tasks.map(task => task.priority).filter(Boolean)); // Get unique priorities
-    priorityFilter.innerHTML = '<option value="all">All Priorities</option>'; // Reset
-    // Add default options if they're not in tasks
+    const priorities = new Set(tasks.map(task => task.priority).filter(Boolean));
+    priorityFilter.innerHTML = '<option value="all">All Priorities</option>';
     const defaultPriorities = ["Scheduled", "Urgent", "High", "Medium", "Low"];
     defaultPriorities.forEach(p => {
         if (!priorities.has(p)) {
@@ -2375,7 +2636,6 @@ function populatePriorityFilter(tasks) {
         }
     });
 
-    // Sort priorities based on a predefined order
     const sortedPriorities = Array.from(priorities).sort((a, b) => {
         const order = { "Urgent": 1, "High": 2, "Medium": 3, "Low": 4, "Scheduled": 5 };
         return (order[a] || 99) - (order[b] || 99);
@@ -2387,7 +2647,6 @@ function populatePriorityFilter(tasks) {
         option.textContent = p;
         priorityFilter.appendChild(option);
     });
-    // Restore previous selection if it still exists
     const currentPriority = priorityFilter.dataset.currentValue || 'all';
     if (Array.from(priorityFilter.options).some(opt => opt.value === currentPriority)) {
         priorityFilter.value = currentPriority;
@@ -2402,41 +2661,35 @@ function filterTasks() {
     const selectedPriority = priorityFilter.value;
     const currentSortOrder = sortOrder.value;
     const shouldShowCompleted = showCompleted.checked;
-    const selectedGoal = goalFilter.value; // NEW: Get selected goal filter
+    const selectedGoal = goalFilter.value; 
 
-    // Store current filter values to reapply after re-rendering
     categoryFilter.dataset.currentValue = selectedCategory;
     priorityFilter.dataset.currentValue = selectedPriority;
     sortOrder.dataset.currentValue = currentSortOrder;
     showCompleted.dataset.currentValue = shouldShowCompleted;
-    goalFilter.dataset.currentValue = selectedGoal; // NEW: Store goal filter value
+    goalFilter.dataset.currentValue = selectedGoal; 
 
     let filteredAndSortedTasks = allTasks.filter(task => {
         const contentMatch = task.content.toLowerCase().includes(searchTerm);
         const categoryMatch = selectedCategory === "all" || task.category === selectedCategory;
         const priorityMatch = selectedPriority === "all" || task.priority === selectedPriority;
         
-        // NEW: Goal filter match
         const goalMatch = selectedGoal === "all" || 
                          (selectedGoal === "no-goal" && !task.goal_id) ||
                          (selectedGoal !== "no-goal" && task.goal_id === selectedGoal);
 
-        // Check subtasks for search term
         const subtaskMatch = task.subtasks && task.subtasks.some(subtask => 
             subtask.content.toLowerCase().includes(searchTerm)
         );
-        // Check attachments for search term (by name)
         const attachmentMatch = task.attachments && task.attachments.some(attachment =>
             attachment.name.toLowerCase().includes(searchTerm)
         );
 
-        // Filter by completion status
         const completionMatch = shouldShowCompleted || !task.is_done;
 
-        return (contentMatch || subtaskMatch || attachmentMatch) && categoryMatch && priorityMatch && completionMatch && goalMatch; // NEW: Include goalMatch
+        return (contentMatch || subtaskMatch || attachmentMatch) && categoryMatch && priorityMatch && completionMatch && goalMatch;
     });
 
-    // Apply sorting
     filteredAndSortedTasks.sort((a, b) => {
         if (currentSortOrder === "dueDateAsc") {
             const dateA = a.due_date ? new Date(a.due_date).getTime() : Infinity;
@@ -2461,7 +2714,7 @@ function filterTasks() {
         } else if (currentSortOrder === "alphabeticalDesc") {
             return b.content.localeCompare(a.content);
         }
-        return 0; // No change in order if no specific sort applied
+        return 0; 
     });
 
     renderTasks(filteredAndSortedTasks);
@@ -2486,13 +2739,11 @@ function clearAllFilters() {
     document.getElementById("searchInput").value = "";
     categoryFilter.value = "all";
     priorityFilter.value = "all";
-    sortOrder.value = "creationDateDesc"; // Default sort order
+    sortOrder.value = "creationDateDesc"; 
     showCompleted.checked = false;
-    goalFilter.value = "all"; // NEW: Clear goal filter
+    goalFilter.value = "all";
     filterTasks();
 }
-
-// --- NEW: Recurrence Logic ---
 
 /**
  * Renders the appropriate recurrence details UI based on the selected type.
@@ -2501,14 +2752,14 @@ function clearAllFilters() {
  * @param {Object} [currentDetails={}] Optional: Current recurrence details to pre-fill inputs.
  */
 function renderRecurrenceDetails(type, container, currentDetails = {}) {
-    container.innerHTML = ''; // Clear previous content
-    container.style.display = 'none'; // Hide by default
+    container.innerHTML = ''; 
+    container.style.display = 'none';
 
     if (type === 'none') {
         return;
     }
 
-    container.style.display = 'flex'; // Show container if recurrence is active
+    container.style.display = 'flex'; 
 
     let html = '';
     switch (type) {
@@ -2617,10 +2868,9 @@ function calculateNextOccurrence(lastOccurrenceDate, recurrenceType, recurrenceD
             break;
         case 'weekly':
             const daysOfWeek = recurrenceDetails.daysOfWeek || [];
-            if (daysOfWeek.length === 0) return null; // Cannot recur weekly without specific days
+            if (daysOfWeek.length === 0) return null; 
 
             let foundNextDay = false;
-            // Start checking from the day after lastOccurrenceDate
             for (let i = 1; i <= 7; i++) { 
                 const potentialNextDate = new Date(lastOccurrenceDate);
                 potentialNextDate.setDate(potentialNextDate.getDate() + i);
@@ -2632,37 +2882,30 @@ function calculateNextOccurrence(lastOccurrenceDate, recurrenceType, recurrenceD
                 }
             }
             if (!foundNextDay) {
-                // This case should ideally not be hit if daysOfWeek is not empty,
-                // but as a fallback, advance by a week.
                 nextDate.setDate(lastOccurrenceDate.getDate() + 7);
             }
             break;
         case 'monthly':
             const dayOfMonth = recurrenceDetails.dayOfMonth;
             if (!dayOfMonth) return null;
-            
-            // Try setting to the specified day of the *current* month
+
             nextDate.setDate(dayOfMonth);
             if (nextDate.getTime() <= lastOccurrenceDate.getTime()) {
-                // If it's already past the day of the month, move to next month
                 nextDate.setMonth(nextDate.getMonth() + 1);
-                nextDate.setDate(dayOfMonth); // Re-set day in case month change affected it (e.g., Feb 30)
+                nextDate.setDate(dayOfMonth); 
             }
-            // Handle months with fewer days (e.g., setting day 31 in February)
             if (nextDate.getDate() !== dayOfMonth) {
-                // If the day doesn't exist in the month (e.g., Feb 30), it rolls over.
-                // We want it to be the specified day of the *next* month.
-                nextDate.setDate(1); // Go to the 1st of the current month
-                nextDate.setMonth(nextDate.getMonth() + 1); // Go to the next month
-                nextDate.setDate(dayOfMonth); // Set the day. If it's invalid, Date object handles it (e.g., Feb 30 becomes Mar 2)
+                nextDate.setDate(1); 
+                nextDate.setMonth(nextDate.getMonth() + 1);
+                nextDate.setDate(dayOfMonth);
             }
             break;
         case 'yearly':
-            const monthAndDay = recurrenceDetails.monthAndDay; // YYYY-MM-DD
+            const monthAndDay = recurrenceDetails.monthAndDay;
             if (!monthAndDay) return null;
-            const [, month, day] = monthAndDay.split('-').map(Number); // Extract month and day
+            const [, month, day] = monthAndDay.split('-').map(Number); 
 
-            nextDate.setMonth(month - 1); // Month is 0-indexed
+            nextDate.setMonth(month - 1);
             nextDate.setDate(day);
             
             if (nextDate.getTime() <= lastOccurrenceDate.getTime()) {
@@ -2671,116 +2914,137 @@ function calculateNextOccurrence(lastOccurrenceDate, recurrenceType, recurrenceD
             break;
     }
 
-    // Ensure the time component is preserved from the original due date
     nextDate.setHours(lastOccurrenceDate.getHours(), lastOccurrenceDate.getMinutes(), lastOccurrenceDate.getSeconds(), lastOccurrenceDate.getMilliseconds());
 
-    // Check against end date
     if (endDate && nextDate.getTime() > endDate.getTime()) {
-        return null; // No more occurrences after end date
+        return null; 
     }
 
     return nextDate;
 }
 
-/**
- * Generates new instances of recurring tasks that are due.
- * This function should be called on app load.
- */
 async function generateRecurringTasks() {
-    if (!currentUser) return; // Only for logged-in users
-
     console.log("Checking for recurring tasks to generate...");
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Normalize to start of current day
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const { data: recurringTasks, error } = await supabase
-        .from("tasks")
-        .select("*, subtasks, attachments, recurrence_type, recurrence_details, original_task_id, next_occurrence_date")
-        .eq("user_id", currentUser.id)
-        .eq("is_done", false) // Only consider active recurring tasks
-        .not("recurrence_type", "eq", "none"); // Only recurring tasks
+    // NEW: Recurring tasks now work in BOTH Supabase (logged-in) mode and
+    // guest/local-storage mode, instead of silently doing nothing for guests.
+    let recurringTasks = [];
+    let guestTasks = null; // only populated (and written back) in guest mode
 
-    if (error) {
-        console.error("Error fetching recurring tasks:", error.message);
-        return;
+    if (currentUser) {
+        const { data, error } = await supabase
+            .from("tasks")
+            .select("*, subtasks, attachments, recurrence_type, recurrence_details, original_task_id, next_occurrence_date")
+            .eq("user_id", currentUser.id)
+            .eq("is_done", false)
+            .not("recurrence_type", "eq", "none");
+
+        if (error) {
+            console.error("Error fetching recurring tasks:", error.message);
+            return;
+        }
+        recurringTasks = data || [];
+    } else {
+        guestTasks = getGuestTasks();
+        recurringTasks = guestTasks.filter(t => !t.is_done && t.recurrence_type && t.recurrence_type !== 'none');
     }
 
+    let guestIdOffset = 0;
+    let generatedAny = false;
+
     for (const task of recurringTasks) {
-        if (task.next_occurrence_date) {
-            let nextOccurrence = new Date(task.next_occurrence_date);
-            nextOccurrence.setHours(0, 0, 0, 0); // Normalize to start of day for comparison
+        if (!task.next_occurrence_date) continue;
 
-            // Loop to generate all overdue instances up to today
-            while (nextOccurrence.getTime() <= today.getTime()) {
-                console.log(`Generating new instance for recurring task: "${task.content}" (Original ID: ${task.id}) due on ${nextOccurrence.toLocaleDateString()}`);
+        let nextOccurrence = new Date(task.next_occurrence_date);
+        nextOccurrence.setHours(0, 0, 0, 0);
 
-                // Create a new task instance
-                const newInstance = {
-                    user_id: currentUser.id,
-                    content: task.content,
-                    is_done: false,
-                    category: task.category,
-                    priority: task.priority,
-                    // Set due_date of the new instance to the calculated next occurrence date, preserving time
-                    due_date: new Date(nextOccurrence.getFullYear(), nextOccurrence.getMonth(), nextOccurrence.getDate(), 
-                                       new Date(task.due_date).getHours(), new Date(task.due_date).getMinutes()).toISOString(), 
-                    position: 0, // New tasks usually go to top or can be re-sorted
-                    notification_time: task.notification_time,
-                    subtasks: task.subtasks ? task.subtasks.map(st => ({ ...st, is_done: false, id: crypto.randomUUID() })) : [], // Reset subtasks completion and assign new IDs
-                    attachments: task.attachments || [], // Attachments are copied (note: actual files not duplicated in storage)
-                    recurrence_type: 'none', // Instances are not recurring themselves
-                    recurrence_details: {},
-                    original_task_id: task.id, // Link to the original recurring task
-                    next_occurrence_date: null, // Instances don't have a next occurrence
-                    created_at: new Date().toISOString(), // Set creation date for the instance
-                    goal_id: task.goal_id, // NEW: Copy goal_id to the new instance
-                };
+        while (nextOccurrence.getTime() <= today.getTime()) {
+            console.log(`Generating new instance for recurring task: "${task.content}" (Original ID: ${task.id}) due on ${nextOccurrence.toLocaleDateString()}`);
 
+            // Guard against a missing/invalid due_date on the original task so
+            // this doesn't throw and silently abort the whole batch.
+            const sourceDueDate = task.due_date ? new Date(task.due_date) : null;
+            const sourceHours = sourceDueDate && !isNaN(sourceDueDate.getTime()) ? sourceDueDate.getHours() : 9;
+            const sourceMinutes = sourceDueDate && !isNaN(sourceDueDate.getTime()) ? sourceDueDate.getMinutes() : 0;
+
+            const newInstance = {
+                content: task.content,
+                is_done: false,
+                category: task.category,
+                priority: task.priority,
+                due_date: new Date(nextOccurrence.getFullYear(), nextOccurrence.getMonth(), nextOccurrence.getDate(),
+                                   sourceHours, sourceMinutes).toISOString(),
+                position: 0,
+                notification_time: task.notification_time,
+                subtasks: task.subtasks ? task.subtasks.map(st => ({ ...st, is_done: false, id: crypto.randomUUID() })) : [],
+                attachments: task.attachments || [],
+                recurrence_type: 'none',
+                recurrence_details: {},
+                original_task_id: task.id,
+                next_occurrence_date: null,
+                created_at: new Date().toISOString(),
+                goal_id: task.goal_id || null,
+            };
+
+            if (currentUser) {
+                newInstance.user_id = currentUser.id;
                 const { error: insertError } = await supabase.from("tasks").insert([newInstance]).select();
                 if (insertError) {
                     console.error("Error creating recurring task instance:", insertError.message);
-                    // If insert fails, break the loop for this task to avoid infinite loops
-                    break; 
+                    break;
                 }
-
-                // Calculate the next recurrence date for the original recurring task
-                const calculatedNext = calculateNextOccurrence(new Date(task.next_occurrence_date), task.recurrence_type, task.recurrence_details);
-                
-                if (calculatedNext) {
-                    task.next_occurrence_date = calculatedNext.toISOString(); // Update task object for next iteration
-                    nextOccurrence = new Date(task.next_occurrence_date);
-                    nextOccurrence.setHours(0, 0, 0, 0); // Normalize for loop condition
-                } else {
-                    // No more occurrences, stop generating for this task
-                    task.next_occurrence_date = null;
-                    break; 
-                }
+            } else {
+                newInstance.id = Date.now() + (guestIdOffset++);
+                guestTasks.push(newInstance);
             }
+            generatedAny = true;
 
-            // After generating all due instances, update the original task's next_occurrence_date in DB
-            const updatePayload = {
-                next_occurrence_date: task.next_occurrence_date,
-            };
+            const calculatedNext = calculateNextOccurrence(new Date(task.next_occurrence_date), task.recurrence_type, task.recurrence_details);
+
+            if (calculatedNext) {
+                task.next_occurrence_date = calculatedNext.toISOString();
+                nextOccurrence = new Date(task.next_occurrence_date);
+                nextOccurrence.setHours(0, 0, 0, 0);
+            } else {
+                task.next_occurrence_date = null;
+                break;
+            }
+        }
+
+        if (currentUser) {
             const { error: updateError } = await supabase
                 .from("tasks")
-                .update(updatePayload)
+                .update({ next_occurrence_date: task.next_occurrence_date })
                 .eq("id", task.id)
                 .eq("user_id", currentUser.id);
 
             if (updateError) {
                 console.error("Error updating original recurring task:", updateError.message);
             }
+        } else {
+            const originalIndex = guestTasks.findIndex(t => t.id === task.id);
+            if (originalIndex !== -1) {
+                guestTasks[originalIndex].next_occurrence_date = task.next_occurrence_date;
+            }
         }
     }
-    await loadTasks(); // Reload tasks to show newly generated instances
-    await loadGoals(); // NEW: Reload goals to update progress for new tasks
+
+    if (!currentUser && guestTasks) {
+        saveGuestTasks(guestTasks);
+        if (generatedAny) {
+            console.log("Recurring task instances generated in Local Storage (Guest Mode).");
+        }
+    }
+
+    await loadTasks();
+    await loadGoals();
 }
 
 
-// NEW: Quill editor instance
 let quill = null;
 
-// NEW: Notes filter and search
 const noteSearchInput = document.getElementById("noteSearchInput");
 const noteCategoryFilter = document.getElementById("noteCategoryFilter");
 const newNoteButton = document.getElementById("newNoteButton");
@@ -2806,7 +3070,6 @@ function populateNoteCategoryFilter(notes) {
         noteCategoryFilter.appendChild(option);
     });
 
-    // Restore previous selection if it exists
     const currentCategory = noteCategoryFilter.dataset.currentValue || 'all';
     if (Array.from(noteCategoryFilter.options).some(opt => opt.value === currentCategory)) {
         noteCategoryFilter.value = currentCategory;
@@ -2828,7 +3091,6 @@ function filterNotes() {
         return (titleMatch || contentMatch) && categoryMatch;
     });
 
-    // Apply sorting for notes
     filteredNotes.sort((a, b) => {
         if (noteSortOrder === "newest") {
             return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
@@ -2843,7 +3105,6 @@ function filterNotes() {
     renderNoteList(filteredNotes);
 }
 
-// NEW: Goal filter and search
 const goalSearchInput = document.getElementById("goalSearchInput");
 const goalStatusFilter = document.getElementById("goalStatusFilter");
 const goalSortOrder = document.getElementById("goalSortOrder");
@@ -2860,7 +3121,6 @@ function filterGoals() {
         return (titleMatch || descriptionMatch) && statusMatch;
     });
 
-    // Apply sorting
     filteredAndSortedGoals.sort((a, b) => {
         if (currentSortOrder === "dueDateAsc") {
             const dateA = a.due_date ? new Date(a.due_date).getTime() : Infinity;
@@ -2872,6 +3132,13 @@ function filterGoals() {
             return dateB - dateA;
         } else if (currentSortOrder === "alphabeticalAsc") {
             return a.title.localeCompare(b.title);
+        } else if (currentSortOrder === "custom") {
+            const posA = a.position ?? Number.MAX_SAFE_INTEGER;
+            const posB = b.position ?? Number.MAX_SAFE_INTEGER;
+            if (posA === posB) {
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            }
+            return posA - posB;
         }
         return 0;
     });
@@ -2879,8 +3146,6 @@ function filterGoals() {
     renderGoals(filteredAndSortedGoals);
 }
 
-
-// --- Goal Add/Edit Modal Logic ---
 const goalModal = document.getElementById("goalModal");
 const goalModalTitle = document.getElementById("goalModalTitle");
 const goalIdInput = document.getElementById("goalId");
@@ -2904,10 +3169,10 @@ function showGoalModal(goal = null) {
         goalStatusSelect.value = goal.status || "active";
     } else {
         goalModalTitle.textContent = "Add New Goal";
-        goalIdInput.value = ""; // Clear for new goal
+        goalIdInput.value = "";
         goalTitleInput.value = "";
         goalDescriptionInput.value = "";
-        goalStartDateInput.value = new Date().toISOString().substring(0, 10); // Default to today
+        goalStartDateInput.value = new Date().toISOString().substring(0, 10);
         goalDueDateInput.value = "";
         goalStatusSelect.value = "active";
     }
@@ -2932,25 +3197,20 @@ async function saveGoal() {
     }
 
     if (goalId) {
-        // Update existing goal
         await updateGoal(goalId, { title, description, start_date: startDate, due_date: dueDate, status });
         showCustomAlert("Goal updated successfully!");
     } else {
-        // Add new goal
         await addGoal(title, description, startDate, dueDate, status);
         showCustomAlert("Goal added successfully!");
     }
     hideGoalModal();
 }
 
-
-// --- Main Init Function ---
 function init() {
   console.log("App initialized ✅");
 
   checkUserAndLoadApp();
 
-  // --- Auth Section Event Listeners ---
   document.getElementById("signUpBtn")?.addEventListener("click", async (event) => {
       event.preventDefault();
       const email = document.getElementById("emailInput").value;
@@ -2974,21 +3234,17 @@ function init() {
     await resetPasswordForEmailUser(email);
   });
 
-  // --- Timer Event Listeners ---
-  if (setButton) setButton.addEventListener("click", setTimer);
+  if (setButton) setButton.addEventListener("click", () => setTimer());
   if (startButton) startButton.addEventListener("click", startTimer);
+  if (pauseButton) pauseButton.addEventListener("click", pauseTimer);
   if (stopButton) stopButton.addEventListener("click", stopTimer);
-  updateTimerDisplay();
+  setTimerMode("pomodoro");
 
-
-  // --- Task Input and Add Button ---
   const addTaskButton = document.getElementById("addTaskButton");
   const taskInput = document.getElementById("taskInput");
   const newAttachmentInput = document.getElementById("newAttachmentInput");
   const triggerNewAttachmentInput = document.getElementById("triggerNewAttachmentInput");
   const newAttachmentsDisplay = document.getElementById("newAttachmentsDisplay");
-
-  // NEW: Recurrence elements for Add Task
   const recurrenceTypeSelect = document.getElementById("recurrenceType");
   const recurrenceDetailsContainer = document.getElementById("recurrenceDetails");
 
@@ -2997,26 +3253,22 @@ function init() {
     if (e.key === "Enter") addTaskFromInput();
   });
 
-  // NEW: Event listener for recurrence type change in Add Task form
   if (recurrenceTypeSelect) {
       recurrenceTypeSelect.addEventListener("change", () => {
           renderRecurrenceDetails(recurrenceTypeSelect.value, recurrenceDetailsContainer);
       });
   }
 
-  // NEW: Event listener for the "Add Attachment" button
   if (triggerNewAttachmentInput) {
       triggerNewAttachmentInput.addEventListener("click", () => {
-          newAttachmentInput.click(); // Programmatically click the hidden file input
+          newAttachmentInput.click(); 
       });
   }
 
-  // NEW: Event listener for the hidden file input to display selected files
   if (newAttachmentInput) {
       newAttachmentInput.addEventListener("change", () => {
-          // Clear previous files if not multi-select, or add to existing
           newSelectedFiles = Array.from(newAttachmentInput.files); 
-          newAttachmentsDisplay.innerHTML = ''; // Clear previous display
+          newAttachmentsDisplay.innerHTML = '';
           if (newSelectedFiles.length > 0) {
               newSelectedFiles.forEach(file => {
                   const fileItem = document.createElement('span');
@@ -3029,30 +3281,23 @@ function init() {
   }
 
 
-  // --- Sidebar Notes Toggle ---
   const toggleNotesBtn = document.getElementById("toggleNotes");
   const notesSidebar = document.getElementById("notesSidebar");
   const closeNotesBtn = document.getElementById("closeNotes");
-  // const notesInput = document.getElementById('notes'); // Old textarea, now replaced by Quill
 
   toggleNotesBtn?.addEventListener("click", () => {
     notesSidebar?.classList.add("open");
     if (toggleNotesBtn) toggleNotesBtn.style.display = "active";
     document.body.classList.add("notes-open");
-    // Hide goals section if notes is opened
     document.getElementById("goalsSection").style.display = "none";
-    document.getElementById("filterSortSection").style.display = "block"; // Show task filters
-    document.getElementById("taskCountToday").style.display = "block"; // Show task counter
-    document.getElementById("taskList").style.display = "block"; // Show task list
+    document.getElementById("tasksPanel").style.display = "block";
     document.getElementById("toggleGoals").classList.remove("active");
-    // loadNote(); // No longer needed here, loadNotes handles initial selection
   });
 
   closeNotesBtn?.addEventListener("click", () => {
     notesSidebar?.classList.remove("open");
     if (toggleNotesBtn) toggleNotesBtn.style.display = "block";
     document.body.classList.remove("notes-open");
-    // Save current note when closing sidebar
     if (currentNoteId && quill) {
         const title = noteTitleInput.value.trim() || "Untitled Note";
         const content = quill.root.innerHTML;
@@ -3061,9 +3306,8 @@ function init() {
     }
   });
 
-  // NEW: Initialize Quill editor
   quill = new Quill('#notes-editor', {
-    theme: 'snow', // Use 'snow' theme (clean, modern)
+    theme: 'snow',
     placeholder: 'Start writing your note...',
     modules: {
       toolbar: [
@@ -3077,12 +3321,11 @@ function init() {
         ['link'],
         [{ 'color': [] }, { 'background': [] }],
         [{ 'align': [] }],
-        ['clean'] // remove formatting button
+        ['clean'] 
       ]
     }
   });
 
-  // NEW: Event listeners for notes functionality
   newNoteButton?.addEventListener("click", createNote);
   deleteNoteButton?.addEventListener("click", () => deleteNote(currentNoteId));
   saveNoteButton?.addEventListener("click", () => {
@@ -3097,7 +3340,6 @@ function init() {
       }
   });
 
-  // Auto-save on title/category change and editor blur
   noteTitleInput?.addEventListener('blur', () => {
       if (currentNoteId && quill) {
           const title = noteTitleInput.value.trim() || "Untitled Note";
@@ -3121,14 +3363,11 @@ function init() {
           const category = noteCategorySelect.value;
           saveNote(currentNoteId, title, content, category);
       }
-  }, 1000)); // Save 1 second after last text change
+  }, 1000));
 
-  // NEW: Note search and category filter listeners
   noteSearchInput?.addEventListener("input", debounce(filterNotes, 300));
   noteCategoryFilter?.addEventListener("change", filterNotes);
-  document.getElementById("noteSortOrder")?.addEventListener("change", filterNotes); // Add listener for note sort order
-
-  // NEW: Custom category for notes
+  document.getElementById("noteSortOrder")?.addEventListener("change", filterNotes); 
   noteCategorySelect?.addEventListener("change", () => {
     if (noteCategorySelect.value === "__custom__") {
       showCustomPrompt("Enter new note category name:", (newCategory) => {
@@ -3143,7 +3382,6 @@ function init() {
               newOption.textContent = trimmedCategory;
               noteCategorySelect.insertBefore(newOption, noteCategorySelect.lastElementChild);
               noteCategorySelect.value = trimmedCategory;
-              // Save the current note with the new category
               if (currentNoteId && quill) {
                 const title = noteTitleInput.value.trim() || "Untitled Note";
                 const content = quill.root.innerHTML;
@@ -3151,47 +3389,37 @@ function init() {
               }
             } else {
               showCustomAlert("That category already exists.");
-              noteCategorySelect.value = "General"; // Revert to default
+              noteCategorySelect.value = "General";
             }
           } else {
-            noteCategorySelect.value = "General"; // Revert to default
+            noteCategorySelect.value = "General";
           }
       }, "General");
     }
   });
 
 
-  // --- NEW: Goals Section Toggle ---
   const toggleGoalsBtn = document.getElementById("toggleGoals");
   const goalsSection = document.getElementById("goalsSection");
-  const filterSortSection = document.getElementById("filterSortSection");
-  const taskCountToday = document.getElementById("taskCountToday");
-  const taskList = document.getElementById("taskList");
+  const tasksPanel = document.getElementById("tasksPanel");
 
   toggleGoalsBtn?.addEventListener("click", () => {
     if (goalsSection.style.display === "none") {
         goalsSection.style.display = "block";
-        filterSortSection.style.display = "none";
-        taskCountToday.style.display = "none";
-        taskList.style.display = "none";
+        tasksPanel.style.display = "none";
         toggleGoalsBtn.classList.add("active");
-        // Hide notes sidebar if goals is opened
         notesSidebar?.classList.remove("open");
         document.body.classList.remove("notes-open");
         toggleNotesBtn.classList.remove("active");
-        filterGoals(); // Render goals when section is opened
+        filterGoals(); 
     } else {
         goalsSection.style.display = "none";
-        filterSortSection.style.display = "block";
-        taskCountToday.style.display = "block";
-        taskList.style.display = "block";
+        tasksPanel.style.display = "block";
         toggleGoalsBtn.classList.remove("active");
-        filterTasks(); // Re-render tasks when goals section is closed
+        filterTasks(); 
     }
   });
 
-
-  // --- Goal Modal Event Listeners ---
   const addNewGoalButton = document.getElementById("addNewGoalButton");
   if (addNewGoalButton) addNewGoalButton.addEventListener("click", () => showGoalModal());
   if (saveGoalButton) saveGoalButton.addEventListener("click", saveGoal);
@@ -3203,14 +3431,9 @@ function init() {
     }
   });
 
-  // NEW: Goal filter and search listeners
   goalSearchInput?.addEventListener("input", debounce(filterGoals, 300));
   goalStatusFilter?.addEventListener("change", filterGoals);
   goalSortOrder?.addEventListener("change", filterGoals);
-
-
-  // --- Reset / Clear Buttons ---
-  // const taskList = document.getElementById("taskList"); // Already defined above
 
   document.getElementById('resetCountBtn')?.addEventListener('click', async () => {
     showCustomConfirm("Are you sure you want to delete all tasks? This cannot be undone.", async () => {
@@ -3218,14 +3441,12 @@ function init() {
             const { error } = await supabase.from('tasks').delete().eq('user_id', currentUser.id);
             if (error) console.error("Error resetting all tasks for user:", error.message);
             else {
-                // Instead of rendering empty, reload tasks to ensure global state is reset
                 await loadTasks(); 
                 showCustomAlert("All tasks reset for your account.");
                 clearAllScheduledNotifications();
             }
         } else {
             saveGuestTasks([]);
-            // Instead of rendering empty, reload tasks to ensure global state is reset
             await loadTasks(); 
         }
     });
@@ -3240,12 +3461,10 @@ function init() {
       if (taskId) {
         tasksToDeleteIds.push(Number(taskId));
       }
-      // Do not remove li directly, loadTasks will re-render
     });
 
     if (tasksToDeleteIds.length > 0) {
       if (currentUser) {
-        // Fetch tasks to get attachment file_paths before deleting
         const { data: tasksWithAttachments, error: fetchError } = await supabase
             .from('tasks')
             .select('id, attachments')
@@ -3287,10 +3506,9 @@ function init() {
       tasksToDeleteIds.forEach(id => clearScheduledNotification(id));
     }
     await updateTaskPositionsInDB();
-    await loadTasks(); // Reload tasks to reflect deletion and update search/filter
+    await loadTasks();
   });
 
-  // --- Category and Priority Custom Options for ADDING tasks ---
   const categorySelect = document.getElementById("categorySelect");
   const prioritySelect = document.getElementById("prioritySelect");
 
@@ -3344,23 +3562,19 @@ function init() {
     }
   });
 
-  // --- Event Listeners for Edit Modal ---
-  // The closeEditModalButton is not present in the HTML, using cancelEditButton instead.
-  if (cancelEditButton) { // Using cancelEditButton as the close button
+  if (cancelEditButton) { 
     cancelEditButton.addEventListener("click", hideEditModal);
   }
   if (saveEditButton) {
     saveEditButton.addEventListener("click", saveEditedTask);
   }
 
-  // Close modal if user clicks outside
   window.addEventListener("click", (event) => {
     if (event.target === editTaskModal) {
       hideEditModal();
     }
   });
 
-  // Add listeners for custom categories/priorities in the EDIT modal as well
   editCategorySelect?.addEventListener("change", () => {
     if (editCategorySelect.value === "__custom__") {
       showCustomPrompt("Enter new category:", (newCategory) => {
@@ -3411,20 +3625,17 @@ function init() {
     }
   });
 
-  // NEW: Event listener for recurrence type change in Edit Task modal
   if (editRecurrenceTypeSelect) {
       editRecurrenceTypeSelect.addEventListener("change", () => {
           renderRecurrenceDetails(editRecurrenceTypeSelect.value, editRecurrenceDetailsContainer);
       });
   }
 
-  // --- Search Input Event Listener ---
   const searchInput = document.getElementById("searchInput");
   if (searchInput) {
-      searchInput.addEventListener("input", debounce(filterTasks, 300)); // Debounced search
+      searchInput.addEventListener("input", debounce(filterTasks, 300));
   }
 
-  // --- Filter and Sort Event Listeners ---
   if (categoryFilter) {
       categoryFilter.addEventListener("change", filterTasks);
   }
@@ -3440,12 +3651,10 @@ function init() {
   if (clearFiltersButton) {
       clearFiltersButton.addEventListener("click", clearAllFilters);
   }
-  // NEW: Goal filter for tasks
   if (goalFilter) {
       goalFilter.addEventListener("change", filterTasks);
   }
 
-} // End of init()
+} 
 
-// Init on DOM ready
 window.addEventListener("DOMContentLoaded", init);

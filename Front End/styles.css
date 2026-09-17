@@ -8,14 +8,14 @@
   --button-fg: #fff;
   --input-bg: #fff;
   --select-bg: #f9f9f9;
-  --highlight-color: #4aa2ff; /* Added for consistent hover states */
+  --highlight-color: #4aa2ff;
   --title-color: #1a1a1a;
-  --today-task-bg: #fff3cd; /* Light yellow for today's tasks */
+  --today-task-bg: #fff3cd; 
   --today-task-border: #ffeeba;
-  --overdue-task-bg: #f8d7da; /* Light red for overdue tasks */
+  --overdue-task-bg: #f8d7da; 
   --overdue-task-border: #f5c6cb;
   --goal-progress-bg: #e0e0e0;
-  --goal-progress-fill: #28a745; /* Green for progress */
+  --goal-progress-fill: #28a745; 
 }
 
 body[data-theme="dark"] {
@@ -28,10 +28,10 @@ body[data-theme="dark"] {
   --input-bg: #1e1e1e;
   --select-bg: #2a2a2a;
   --highlight-color: #4aa2ff;
-  --title-color: #007bff; /* Title color for dark theme */
-  --today-task-bg: #4a4a0037; /* Darker yellow for today's tasks */
+  --title-color: #007bff; 
+  --today-task-bg: #4a4a0037; 
   --today-task-border: #66660088;
-  --overdue-task-bg: #6a000036; /* Darker red for overdue tasks */
+  --overdue-task-bg: #6a000036; 
   --overdue-task-border: #8b0000a0;
   --goal-progress-bg: #444;
   --goal-progress-fill: #28a745;
@@ -48,8 +48,8 @@ body {
   background-color: var(--bg);
   font-family: Arial, sans-serif;
   color: var(--fg);
-  padding: 0 20px; /* Added padding to body to match navbar's side padding */
-  box-sizing: border-box; /* Ensures padding is included in the element's total width */
+  padding: 0 20px;
+  box-sizing: border-box;
 }
 
 h1 {
@@ -75,8 +75,8 @@ h1::after {
 
 hr.custom-hr {
   width: 100%;
-  max-width: none; /* Removed max-width to allow it to be full width */
-  margin: 20px 0; /* Changed from auto to 0 for full width without centering */
+  max-width: none; 
+  margin: 20px 0; 
   border: none;
   border-top: 1px solid var(--border);
   opacity: 0.6;
@@ -94,7 +94,6 @@ hr.custom-hr {
   border: 0;
 }
 
-/* --- Navigation Bar Styles --- */
 #main-navbar {
   display: flex;
   justify-content: space-between;
@@ -117,7 +116,7 @@ hr.custom-hr {
   display: flex;
   align-items: center;
   gap: 20px;
-  flex-wrap: wrap; /* Allow navigation items to wrap */
+  flex-wrap: wrap;
 }
 
 .nav-title {
@@ -149,10 +148,9 @@ hr.custom-hr {
   width: 120px;
 }
 
-/* New search input styling */
 .search-input {
-  flex-grow: 1; /* Allows it to take available space */
-  max-width: 250px; /* Max width for larger screens */
+  flex-grow: 1;
+  max-width: 250px;
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -188,7 +186,7 @@ hr.custom-hr {
 
 #toggleNotes.notes-toggle,
 #themeToggle.theme-toggle,
-#toggleGoals.goals-toggle { /* NEW: Added goals-toggle */
+#toggleGoals.goals-toggle { 
   background: none;
   border: none;
   font-size: 1.5rem;
@@ -202,14 +200,14 @@ hr.custom-hr {
 
 #toggleNotes.notes-toggle:hover,
 #themeToggle.theme-toggle:hover,
-#toggleGoals.goals-toggle:hover { /* NEW: Added goals-toggle */
+#toggleGoals.goals-toggle:hover { 
   color: var(--highlight-color);
   background-color: rgba(0, 0, 0, 0.1);
 }
 
 #toggleNotes.notes-toggle svg,
 #themeToggle.theme-toggle svg,
-#toggleGoals.goals-toggle svg { /* NEW: Added goals-toggle */
+#toggleGoals.goals-toggle svg { 
   width: 24px;
   height: 24px;
   fill: currentColor;
@@ -217,75 +215,164 @@ hr.custom-hr {
   color: var(--button-fg);
 }
 
-/* --- Main Content Layout --- */
 #mainContent {
-  padding-top: 10px; /* Increased padding */
-  width: 100%; /* Changed to 100% */
-  max-width: 95%; /* Removed max-width restriction */
-  margin: 0; /* Changed from 0 auto to 0 to prevent centering */
+  padding-top: 10px;
+  width: 100%;
+  max-width: 95%; 
+  margin: 0 auto; 
   display: flex;
   flex-direction: column;
-  align-items: stretch; /* Changed from center to stretch to allow children to fill width */
-  transition: transform 0.3s ease;
+  align-items: stretch; 
+  transition: width 0.3s ease, margin-right 0.3s ease;
 }
 
 body.notes-open #mainContent {
-  /* Adjusted transform based on new sidebar width */
-  transform: translateX(-10vw); /* Use viewport width for more flexibility */
+  width: calc(100% - 42vw);
+  margin-right: 42vw;
+  margin-left: 0;
 }
 
+/* --- Pomodoro Timer (compact, circular) --- */
+.pomodoro-card {
+  display: flex;
+  justify-content: center;
+}
 
-/* --- Timer Styles --- */
-#timer {
-  font-size: 48px;
+#timer-section {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pomodoro-modes {
+  display: flex;
+  gap: 6px;
+  background-color: var(--select-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  margin-top: 4px;
+}
+
+.mode-button {
+  border: none;
+  background: transparent;
   color: var(--fg);
-  margin-bottom: 20px;
-  margin-top: 8%;
-  justify-self: center;
+  font-size: 0.8em;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-#timer.active {
-  opacity: 1;
-  height: auto;
-  pointer-events: auto;
+.mode-button:hover {
+  background-color: var(--card-bg);
 }
 
-#timerBarContainer {
-  width: 50%;
-  max-width: none; /* Removed max-width to allow it to be full width */
-  height: 10px;
-  justify-self: center;
-  background-color: var(--border);
-  border-radius: 5px;
-  margin-bottom: 20px;
-  overflow: hidden;
-}
-
-#timerBar {
-  height: 100%;
-  width: 0%;
+.mode-button.active {
   background-color: var(--button-bg);
-  transition: width 1s linear;
+  color: var(--button-fg);
+}
+
+.pomodoro-ring-wrap {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  margin: 18px auto 12px;
+}
+
+.pomodoro-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.pomodoro-ring-bg {
+  fill: none;
+  stroke: var(--goal-progress-bg, var(--border));
+  stroke-width: 10;
+}
+
+.pomodoro-ring-progress {
+  fill: none;
+  stroke: var(--highlight-color);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 553; /* 2 * PI * r(88) */
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.3s linear, stroke 0.3s ease;
+}
+
+.pomodoro-ring-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+
+#timer {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--fg);
+  line-height: 1;
+}
+
+.pomodoro-session-label {
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+body[data-theme="dark"] .pomodoro-session-label {
+  color: #aaa;
 }
 
 .timer-controls {
   display: flex;
   justify-content: center;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 35px;
-  margin-top: 1rem;
+  margin-bottom: 10px;
+  margin-top: 4px;
 }
 
 .timer-controls .input {
-  width: 80px;
-  padding: 10px 14px;
-  font-size: 1rem;
+  width: 64px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  height: auto;
   border-radius: 6px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
 }
 
-/* --- Form Elements (Inputs, Buttons, Selects) --- */
+.timer-controls .button {
+  padding: 8px 16px;
+  font-size: 0.9em;
+}
+
+.timer-task-link {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.timer-task-link .select-box {
+  width: 100%;
+  min-width: unset;
+  padding: 8px 30px 8px 12px;
+  font-size: 0.85em;
+}
+
 .input,
 .button {
   padding: 9px 20px;
@@ -296,21 +383,20 @@ body.notes-open #mainContent {
   transition: background-color 0.3s ease;
 }
 
-
 .input {
   background-color: var(--input-bg);
   color: var(--fg);
   border: 1px solid var(--border);
   width: 100px;
-  text-align: center;
+  text-align: left;
   box-sizing: border-box;
   height: 38px;
   padding: 8px 12px;
 }
 
-textarea.input { /* NEW: Styling for textarea inputs */
-    min-height: 80px; /* Default height for textarea */
-    resize: vertical; /* Allow vertical resizing */
+textarea.input { 
+    min-height: 80px;
+    resize: vertical;
     text-align: left;
 }
 
@@ -332,34 +418,31 @@ textarea.input { /* NEW: Styling for textarea inputs */
   border-color: #999;
 }
 
-/* Remove number input spinners in most browsers */
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-/* Date input specific styling */
 input[type="date"].date-input {
-  width: auto; /* Adjust width as needed */
-  min-width: 280px; /* Minimum width for date input */
+  width: auto; 
+  min-width: 280px; 
   padding: 10px 14px;
   font-size: 14px;
   border-radius: 6px;
   border: 1px solid var(--border);
   background-color: var(--select-bg);
   color: var(--fg);
-  text-align: left; /* Align text to left for date */
+  text-align: left; 
 }
 body[data-theme="dark"] input[type="date"].date-input {
-  color-scheme: dark; /* Ensures date picker calendar is dark */
+  color-scheme: dark; 
   background-color: var(--select-bg);
 }
 
-/* NEW: Time input specific styling */
 input[type="time"].time-input {
-  width: auto; /* Adjust width as needed */
-  min-width: 280px; /* Minimum width for time input */
+  width: auto; 
+  min-width: 280px; 
   padding: 8px 12px;
   font-size: 14px;
   border-radius: 6px;
@@ -370,7 +453,7 @@ input[type="time"].time-input {
 
 }
 body[data-theme="dark"] input[type="time"].time-input {
-  color-scheme: dark; /* Ensures time picker is dark */
+  color-scheme: dark; 
   background-color: var(--select-bg);
 }
 
@@ -395,6 +478,9 @@ body[data-theme="dark"] input[type="time"].time-input {
   background-position: right 10px center;
   background-size: 26px;
   min-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 body[data-theme="dark"] .select-box {
@@ -414,8 +500,6 @@ body[data-theme="dark"] .select-box {
 }
 
 
-/* --- Task Management Sections --- */
-/* NEW: Task Add Section for improved UX */
 .task-add-section {
   background-color: var(--card-bg);
   border: 1px solid var(--border);
@@ -433,21 +517,21 @@ body[data-theme="dark"] .select-box {
   margin-bottom: 10px;
   margin-top: 14px;
   align-items: center;
-  flex-wrap: wrap; /* Allow input group items to wrap */
+  flex-wrap: wrap; 
 }
 
 .task-input-group .input {
   flex-grow: 1;
-  padding: 12px 15px; /* Slightly larger padding for main task input */
+  padding: 12px 15px; 
   font-size: 16px;
-  width: auto; /* Override default input width */
-  text-align: left; /* Align text to left */
+  width: auto; 
+  text-align: left;
 }
 
 .task-details-row {
   display: flex;
-  flex-wrap: wrap; /* Allows items to wrap on smaller screens */
-  gap: 15px; /* Space between input fields */
+  flex-wrap: wrap;
+  gap: 15px; 
   margin-left: 5px;
   justify-content: center;
   align-items: center;
@@ -456,7 +540,7 @@ body[data-theme="dark"] .select-box {
 .input-field {
   display: flex;
   flex-direction: column;
-  min-width: 80px; /* Ensures fields don't get too small */
+  min-width: 80px; 
 }
 
 .input-field label,
@@ -471,7 +555,7 @@ body[data-theme="dark"] .select-box {
 .input-field .select-box,
 .input-field .date-input,
 .input-field .time-input {
-  width: 100%; /* Make them fill their container */
+  width: 100%; 
   box-sizing: border-box;
 }
 .modal-content .input-field input,
@@ -480,7 +564,6 @@ body[data-theme="dark"] .select-box {
   height: 38px;
   padding: 8px 12px;
 }
-/* END NEW: Task Add Section */
 .timer-add-section {
   background-color: var(--card-bg);
   border: 1px solid var(--border);
@@ -494,7 +577,7 @@ body[data-theme="dark"] .select-box {
 
 #taskList {
   width: 100%;
-  max-width: none; /* Removed max-width to allow it to be full width */
+  max-width: none;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -516,7 +599,6 @@ body[data-theme="dark"] .select-box {
   transition: all 0.2s ease-in-out;
 }
 
-/* Date-related signalization */
 #taskList li.task-due-today {
   background-color: var(--today-task-bg);
   border: 1px solid var(--today-task-border);
@@ -527,25 +609,22 @@ body[data-theme="dark"] .select-box {
   border: 1px solid var(--overdue-task-border);
 }
 
-/* NEW: Due Date Status Colors for the entire task item (li) */
 #taskList li.overdue-task {
-  border-left: 5px solid #dc3545; /* Red border for overdue */
+  border-left: 5px solid #dc3545;
   background-color: var(--overdue-task-bg);
 }
 
 #taskList li.today-task {
-  border-left: 5px solid #ffc107; /* Yellow/Orange border for today */
+  border-left: 5px solid #ffc107; 
   background-color: var(--today-task-bg);
 }
 
 #taskList li.future-task {
-  /* Optional: A subtle blue border for future tasks */
   border-left: 5px solid #007bff;
 }
 
 #taskList li.no-due-date {
-  /* No special border or color for tasks without a due date */
-  border-left: 5px solid transparent; /* To keep alignment consistent */
+  border-left: 5px solid transparent;
 }
 
 
@@ -592,27 +671,7 @@ body[data-theme="dark"] #taskList li:not(.finished):hover {
   box-shadow: 0 0 8px rgba(74, 162, 255, 0.4);
 }
 
-/* Removed task-edit-input as editing is now in modal */
-/* .task-edit-input {
-  flex-grow: 1;
-  font-size: 16px;
-  padding: 8px 16px;
-  max-width: 95%;
-  border-radius: 15px;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  border: 1px solid var(--border);
-  box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
 
-.task-edit-input:focus {
-  border-color: var(--button-bg);
-  box-shadow: 0 0 5px var(--button-bg);
-  outline: none;
-} */
-
-/* Task Markdown Styles */
 .task-text h1,
 .task-text h2,
 .task-text h3 {
@@ -640,56 +699,50 @@ body[data-theme="dark"] .task-text code {
 }
 
 /* Task Buttons */
-.delete-button {
-  background: var(--select-bg);
-  border: none;
-  color: var(--fg);
-  width: 28px;
-  height: 28px;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  border-radius: 50%;
-  user-select: none;
-  transition: background-color 0.2s ease;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-
-.delete-button:hover {
-  background: #ccc;
-}
-
+.delete-button,
 .edit-button {
-  background-color: var(--select-bg); /* Use primary button color */
-  color: var(--button-fg);
-  padding: 8px 12px;
-  border-radius: 50%;
+  background-color: var(--select-bg);
+  color: var(--fg);
   border: none;
+  border-radius: 50%;
   cursor: pointer;
-  transition: background-color 0.2s ease;
-  font-size: 12px; /* Smaller font for inline button */
-  display: flex; /* For SVG centering */
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  user-select: none;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
-  user-select: none;
-  width: 28px;
-  height: 28px;
+  flex-shrink: 0;
+}
+
+.delete-button svg,
+.edit-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  display: block;
 }
 
 .edit-button:hover {
-  background-color: #ccc;
+  background-color: var(--highlight-color);
+  color: #fff;
 }
 
-.edit-button svg {
-  width: 16px; /* Adjusted size for better visibility */
-  height: 16px; /* Adjusted size for better visibility */
-  fill: currentColor;
-  display: block;
-  filter: none;
-  box-shadow: none;
+.delete-button:hover {
+  background-color: #e0574c;
+  color: #fff;
+}
+
+.delete-button:active,
+.edit-button:active {
+  transform: scale(0.92);
 }
 
 .reset-button {
@@ -707,34 +760,49 @@ body[data-theme="dark"] .task-text code {
   background-color: #b02a37;
 }
 
-/* --- Task Labels & Counters --- */
-
 .category-label {
   display: inline-block;
   background-color: var(--select-bg);
   color: var(--fg);
-  padding: 5px 10px; /* Reduced padding */
-  font-size: 12px; /* Reduced font size */
+  padding: 5px 10px; 
+  font-size: 12px;
   border-radius: 12px;
   user-select: none;
   transition: background-color 0.2s ease;
   text-align: center;
   max-width: max-content;
-  box-sizing: border-box; /* Include padding/border in width */
+  box-sizing: border-box; 
 }
 .due-date-display {
   display: inline-block;
   background-color: var(--select-bg);
   color: var(--fg);
-  padding: 5px 10px; /* Reduced padding */
-  font-size: 12px; /* Reduced font size */
+  padding: 5px 10px; 
+  font-size: 12px; 
   border-radius: 12px;
   user-select: none;
   transition: background-color 0.2s ease;
   text-align: center;
-  min-width: 140px; /* Adjusted width */
-  width: max-content; /* Allow content to define width */
-  box-sizing: border-box; /* Include padding/border in width */
+  min-width: 140px;
+  width: max-content; 
+  box-sizing: border-box; 
+}
+.goal-label{
+    display: inline-block;
+  background-color: var(--select-bg);
+  color: var(--fg);
+  padding: 5px 10px; 
+  font-size: 12px; 
+  border-radius: 12px;
+  user-select: none;
+  transition: background-color 0.2s ease;
+  text-align: center;
+  min-width: 140px;
+  width: max-content; 
+  box-sizing: border-box; 
+}
+.goal-label:empty{
+  display: none;
 }
 .due-date-display:empty {
   display: none;
@@ -743,14 +811,14 @@ body[data-theme="dark"] .task-text code {
   display: inline-block;
   background-color: var(--select-bg);
   color: var(--fg);
-  padding: 5px 10px; /* Reduced padding */
-  font-size: 12px; /* Reduced font size */
+  padding: 5px 10px; 
+  font-size: 12px; 
   border-radius: 12px;
   user-select: none;
   transition: background-color 0.2s ease;
   text-align: center;
   max-width: max-content;
-  box-sizing: border-box; /* Include padding/border in width */
+  box-sizing: border-box; 
 }
 .notification-time-display:empty {
   display: none;
@@ -759,18 +827,17 @@ body[data-theme="dark"] .task-text code {
   display: inline-block;
   background-color: var(--select-bg);
   color: var(--fg);
-  padding: 5px 10px; /* Reduced padding */
-  font-size: 12px; /* Reduced font size */
+  padding: 5px 10px;
+  font-size: 12px;
   border-radius: 12px;
   user-select: none;
   transition: background-color 0.2s ease;
   text-align: center;
   max-width: max-content;
-  box-sizing: border-box; /* Include padding/border in width */
+  box-sizing: border-box; 
 }
-/* Specific text colors for the display if needed */
 #taskList li.overdue-task .due-date-display {
-  color: #dc3545; /* Red text for overdue */
+  color: #dc3545;
   font-weight: bold;
 }
 
@@ -781,23 +848,21 @@ body[data-theme="dark"] .task-text code {
 
 
 .priority-label {
-  padding-right: 10px; /* Slightly different for priority if needed */
+  padding-right: 10px; 
 }
 
-
-/* Hover states for category and priority labels */
 .category-label:hover,
 .priority-label:hover,
-.due-date-display:hover, /* Added due-date-display */
-.notification-time-display:hover { /* Added notification-time-display */
+.due-date-display:hover, 
+.notification-time-display:hover { 
   background-color: #ccc;
 }
 
 /* Dark theme hover states */
 body[data-theme="dark"] .category-label:hover,
 body[data-theme="dark"] .priority-label:hover,
-body[data-theme="dark"] .due-date-display:hover, /* Added due-date-display */
-body[data-theme="dark"] .notification-time-display:hover { /* Added notification-time-display */
+body[data-theme="dark"] .due-date-display:hover, 
+body[data-theme="dark"] .notification-time-display:hover {
   background-color: #333;
 }
 
@@ -839,19 +904,19 @@ body[data-theme="dark"] .task-counter-content .count {
   align-items: center;
 }
 
-.task-control-row { /* This class is now mostly replaced by .task-add-section */
+.task-control-row { 
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  width: 100%; /* Ensure it takes full width */
+  width: 100%;
   gap: 12px;
 }
 
 .task-counter-line {
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px 16px; /* Increased padding */
+  padding: 12px 16px; 
   background-color: var(--card-bg);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   align-items: center;
@@ -876,13 +941,11 @@ body[data-theme="dark"] .task-counter-line:hover {
   border-left: 5px solid rgba(141, 141, 141, 0.196);
 }
 
-
-/* --- Notes Sidebar --- */
 .notes-sidebar {
   position: fixed;
   top: 0;
   right: -100%;
-  width: 40vw; /* Changed to viewport width for responsiveness */
+  width: 40vw;
   max-width: 100%;
   height: 95%;
   background: var(--card-bg);
@@ -911,69 +974,66 @@ body[data-theme="dark"] .task-counter-line:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px; /* Increased margin for better spacing */
+  margin-bottom: 15px; 
   padding-left: 10px;
-  padding-bottom: 10px; /* Add some padding below the header content */
-  border-bottom: 1px solid var(--border); /* Subtle separator */
+  padding-bottom: 10px; 
+  border-bottom: 1px solid var(--border); 
 }
 
-/* NEW: Styles for the Notes Title */
 .notes-title {
-  font-size: 1.6rem; /* Slightly larger for prominence */
+  font-size: 1.6rem; 
   font-weight: 700;
-  color: var(--title-color); /* Use the main title color variable */
-  margin: 0; /* Remove default margins */
-  display: flex; /* Align icon and text */
+  color: var(--title-color); 
+  margin: 0; 
+  display: flex; 
   align-items: center;
-  gap: 10px; /* Space between icon and text */
+  gap: 10px; 
 }
 
-/* NEW: Styles for the Notes Icon (📒) */
 .notes-title .circle-icon {
-  background-color: var(--button-bg); /* Use primary button color for icon background */
-  color: var(--button-fg); /* Use button foreground color for icon text */
+  background-color: var(--button-bg); 
+  color: var(--button-fg);
   border-radius: 50%;
-  width: 36px; /* Slightly larger icon */
+  width: 36px; 
   height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem; /* Adjust emoji size */
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+  font-size: 1.2rem; 
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); 
 }
 
 body[data-theme="dark"] .notes-title .circle-icon {
-  background-color: var(--highlight-color); /* Different color for dark theme icon */
-  color: var(--card-bg); /* Dark theme icon color */
+  background-color: var(--highlight-color); 
+  color: var(--card-bg);
 }
 
 
-/* Enhanced Close Button Styles */
 .close-button {
   width: 32px;
   height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: transparent; /* Start with transparent background */
-  color: var(--fg); /* Use foreground color for the 'X' */
-  font-size: 1.2em; /* Slightly larger 'X' */
+  background-color: transparent; 
+  color: var(--fg); 
+  font-size: 1.2em;
   font-weight: bold;
-  border: 1px solid var(--border); /* Keep a subtle border */
+  border: 1px solid var(--border); 
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.25s ease;
-  margin-right: 5px; /* Adjust margin */
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+  margin-right: 5px; 
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); 
 }
 
 .close-button:hover,
 .close-button:focus {
-  background-color: var(--select-bg); /* Light background on hover */
-  color: var(--highlight-color); /* Highlight color for 'X' on hover */
-  border-color: var(--highlight-color); /* Highlight border on hover */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* More prominent shadow on hover */
-  transform: scale(1.05); /* Slight scale effect */
+  background-color: var(--select-bg);
+  color: var(--highlight-color); 
+  border-color: var(--highlight-color); 
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); 
+  transform: scale(1.05); 
 }
 
 body[data-theme="dark"] .close-button {
@@ -982,13 +1042,11 @@ body[data-theme="dark"] .close-button {
 }
 
 body[data-theme="dark"] .close-button:hover {
-  background-color: var(--input-bg); /* Darker background on hover */
+  background-color: var(--input-bg); 
   color: var(--highlight-color);
   border-color: var(--highlight-color);
 }
 
-
-/* NEW: Notes specific styles */
 .notes-controls {
     display: flex;
     flex-wrap: wrap;
@@ -1006,7 +1064,7 @@ body[data-theme="dark"] .close-button:hover {
 }
 
 .notes-controls .select-box {
-    min-width: max-content; /* Allow it to shrink */
+    min-width: max-content; 
     width: auto;
     flex-grow: 1;
     padding-right: 2.4rem;
@@ -1016,7 +1074,7 @@ body[data-theme="dark"] .close-button:hover {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    justify-content: flex-end; /* Align buttons to the right */
+    justify-content: flex-end; 
     flex-grow: 1;
 }
 
@@ -1026,9 +1084,9 @@ body[data-theme="dark"] .close-button:hover {
 }
 
 .note-list-container {
-    flex-grow: 0; /* Don't let it grow */
-    flex-shrink: 0; /* Don't let it shrink */
-    max-height: 200px; /* Limit height for scrollability */
+    flex-grow: 0; 
+    flex-shrink: 0; 
+    max-height: 200px; 
     overflow-y: auto;
     margin-bottom: 15px;
     border: 1px solid var(--border);
@@ -1069,7 +1127,7 @@ body[data-theme="dark"] .close-button:hover {
 }
 
 body[data-theme="dark"] .note-list-container li.selected {
-    background-color: #0056b3; /* Darker blue for selected in dark theme */
+    background-color: #0056b3; 
 }
 
 .note-list-item-title {
@@ -1115,13 +1173,12 @@ body[data-theme="dark"] .note-list-item-date {
     min-width: unset;
 }
 
-/* Quill Editor Styles */
 .notes-editor {
-    height: 100%; /* Fill remaining space in its container */
-    min-height: 200px; /* Minimum height for the editor */
+    height: 100%; 
+    min-height: 200px; 
     border: 1px solid var(--border);
     border-radius: 5px;
-    overflow-y: auto; /* Enable scrolling for content */
+    overflow-y: auto; 
     background-color: var(--input-bg);
 }
 
@@ -1139,7 +1196,7 @@ body[data-theme="dark"] .note-list-item-date {
 }
 
 .notes-editor .ql-editor {
-    min-height: 150px; /* Min height for the editable area */
+    min-height: 150px; 
     padding: 15px;
     line-height: 1.6;
 }
@@ -1192,7 +1249,7 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
 }
 
 #notesSidebar .button {
-    width: auto; /* Override full width from general button style */
+    width: auto;
 }
 
 /* --- Drag & Drop --- */
@@ -1200,24 +1257,20 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
   opacity: 0.5;
 }
 
-/* Base dragover style - can be used for general highlight */
 #taskList li.dragover {
-    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5); /* Optional: add a glow effect */
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
 }
 
-/* Specific styles for top and bottom insertion points */
 #taskList li.dragover-top {
     border-top: 3px solid var(--highlight-color);
-    border-bottom: none; /* Ensure only one border is active */
+    border-bottom: none;
 }
 
 #taskList li.dragover-bottom {
     border-bottom: 3px solid var(--highlight-color);
-    border-top: none; /* Ensure only one border is active */
+    border-top: none; 
 }
 
-
-/* --- Custom Modal Styles (for alerts, confirms, prompts) --- */
 .custom-modal {
   position: fixed;
   top: 0;
@@ -1228,7 +1281,7 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 2000; /* Ensure it's above everything */
+  z-index: 2000; 
 }
 
 .custom-modal-content {
@@ -1274,7 +1327,7 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
   transition: background-color 0.2s ease;
 }
 
-.custom-modal-button:not(.confirm-button):not(.cancel-button) { /* For 'OK' button */
+.custom-modal-button:not(.confirm-button):not(.cancel-button) { 
   background-color: var(--button-bg);
   color: var(--button-fg);
 }
@@ -1284,7 +1337,7 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
 }
 
 .custom-modal-button.confirm-button {
-  background-color: #28a745; /* Green for Yes/Confirm */
+  background-color: #28a745; 
   color: white;
 }
 
@@ -1293,7 +1346,7 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
 }
 
 .custom-modal-button.cancel-button {
-  background-color: #dc3545; /* Red for No/Cancel */
+  background-color: #dc3545; 
   color: white;
 }
 
@@ -1302,20 +1355,19 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
 }
 
 
-/* --- Task Edit Modal Styles (NEW) --- */
 .modal {
-  display: none; /* Hidden by default */
-  position: fixed; /* Stay in place */
-  z-index: 200; /* Sit on top, above other modals if any */
+  display: none; 
+  position: fixed;
+  z-index: 200; 
   left: 0;
   top: 0;
-  width: 100%; /* Full width */
+  width: 100%;
   height: 100%;
-  overflow: auto; /* Enable scroll if needed */
-  background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+  overflow: auto; 
+  background-color: rgba(0,0,0,0.6); 
   justify-content: center;
   align-items: center;
-  padding-top: 50px; /* To push content down slightly from top */
+  padding-top: 50px; 
   box-sizing: border-box;
 }
 
@@ -1326,7 +1378,7 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
   box-shadow: 0 5px 15px rgba(0,0,0,0.3);
   position: relative;
   width: 90%;
-  max-width: 688px; /* Max width for larger screens */
+  max-width: 688px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1358,7 +1410,7 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
   font-size: 1em;
 }
 
-.modal .close-button { /* Specific close button for this modal */
+.modal .close-button {
   font-size: 28px;
   font-weight: bold;
   position: absolute;
@@ -1384,12 +1436,12 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
 }
 
 .modal-buttons .button {
-  flex-grow: 1; /* Allow buttons to expand */
-  padding: 12px 25px; /* Adjust padding */
+  flex-grow: 1;
+  padding: 12px 25px; 
 }
 
 .button-secondary {
-  background-color: #6c757d; /* A different color for secondary action */
+  background-color: #6c757d; 
 }
 
 .button-secondary:hover {
@@ -1414,9 +1466,9 @@ body[data-theme="dark"] .notes-editor .ql-snow .ql-tooltip input[type=text] {
 }
 .grid-item {
   padding: 15px;
-  border: 1px solid #ccc; /* Optional: for visual separation */
+  border: 1px solid #ccc; 
   border-radius: 10px;
-  background-color: #f9f9f9; /* Optional: for visual distinction */
+  background-color: #f9f9f9; 
 }
 body[data-theme="dark"] .grid-item {
   background-color: #1e1e1e;
@@ -1427,27 +1479,10 @@ body[data-theme="dark"] .grid-item:hover {
   border: none;
   transition: background-color 0.3s ease, border 0.3s ease;
 }
-.circle-icon {
-  background-color: #007bff;
-  color: white;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 10px;
-  font-size: 1rem;
-  margin-left: 15px;
-}
-body[data-theme="dark"] .circle-icon {
-  background-color: var(--select-bg);
-}
 
-/* --- Subtask Styles --- */
 .subtasks-container {
   width: 100%;
-  padding-left: 20px; /* Indent subtasks */
+  padding-left: 20px; 
   padding-top: 10px;
   border-top: 1px dashed var(--border);
   margin-top: 10px;
@@ -1488,6 +1523,8 @@ body[data-theme="dark"] .circle-icon {
 .subtask-list {
   list-style: none;
   padding: 0;
+  padding-top: 10px;
+  padding-bottom: 10px;
   margin: 0;
 }
 
@@ -1495,7 +1532,7 @@ body[data-theme="dark"] .circle-icon {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 0;
+  padding: 10px 0;
   border-bottom: 1px dotted var(--border);
 }
 
@@ -1504,7 +1541,7 @@ body[data-theme="dark"] .circle-icon {
 }
 
 .subtask-item input[type="checkbox"] {
-  accent-color: #28a745; /* Green for subtask checkboxes */
+  accent-color: #28a745; 
 }
 
 .subtask-text {
@@ -1522,7 +1559,7 @@ body[data-theme="dark"] .circle-icon {
 .subtask-delete-button {
   background: none;
   border: none;
-  color: #dc3545; /* Red for delete */
+  color: #dc3545; 
   width: 20px;
   height: 20px;
   font-size: 0.8em;
@@ -1535,7 +1572,7 @@ body[data-theme="dark"] .circle-icon {
 }
 
 .subtask-delete-button:hover {
-  background-color: #f8d7da; /* Light red background on hover */
+  background-color: #f8d7da;
 }
 
 body[data-theme="dark"] .subtask-delete-button:hover {
@@ -1547,7 +1584,7 @@ body[data-theme="dark"] .subtask-delete-button:hover {
     border: none;
     cursor: pointer;
     padding: 5px;
-    margin-left: auto; /* Push to the right */
+    margin-left: auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1562,7 +1599,7 @@ body[data-theme="dark"] .subtask-delete-button:hover {
 }
 
 .toggle-subtasks-button.expanded svg {
-    transform: rotate(180deg); /* Rotate up when expanded */
+    transform: rotate(180deg); 
 }
 .subtask-progress-display {
   display: inline-block;
@@ -1581,20 +1618,91 @@ body[data-theme="dark"] .subtask-delete-button:hover {
   display: none;
 }
 
-/* NEW: Filter and Sort Section Styles */
+.tasks-panel {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.tasks-panel .filter-controls {
+    margin: 0;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.tasks-panel .task-counter-line {
+    border: none;
+    border-left: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    padding: 12px 0;
+    margin: 0;
+    min-width: 0;
+    border-bottom: 1px solid var(--border);
+}
+body[data-theme="dark"] .tasks-panel .task-counter-line {
+    border: none;
+    border-bottom: 1px solid var(--border);
+    box-shadow: none;
+    background: transparent;
+}
+.tasks-panel .task-counter-line:hover {
+    border-color: var(--border);
+    border-bottom-color: var(--select-bg);
+}
+body[data-theme="dark"] .tasks-panel .task-counter-line:hover {
+    box-shadow: none;
+    border-bottom-color: var(--select-bg);
+}
+
+.tasks-panel #taskList {
+    margin-top: 12px;
+}
+
 .filter-controls {
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
-    margin-top: 10px;
-    align-items: flex-end; /* Aligns items at the bottom */
+    gap: 14px;
+    margin-top: 0;
+    align-items: flex-end;
+}
+
+.filter-controls .input-field {
+    min-width: 150px;
+}
+
+.filter-controls .select-box {
+    min-width: 150px;
+    width: 100%;
+    padding: 9px 30px 9px 14px;
+    font-size: 0.88em;
+}
+
+.filter-controls .button {
+    height: 38px;
+}
+
+.filter-controls .checkbox-field {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-top: 0;
+    height: 38px;
+}
+
+.filter-controls .checkbox-field label {
+    font-size: 0.9em;
+    font-weight: normal;
+    margin-bottom: 0;
+    white-space: nowrap;
 }
 
 .checkbox-field {
-    flex-direction: row; /* Align checkbox and label horizontally */
+    flex-direction: row; 
     align-items: center;
     gap: 8px;
-    margin-top: 8px; /* Adjust spacing */
+    margin-top: 8px; 
 }
 
 .checkbox-field input[type="checkbox"] {
@@ -1605,10 +1713,9 @@ body[data-theme="dark"] .subtask-delete-button:hover {
 }
 
 #clearFiltersButton {
-    margin-top: 10px; /* Space from other controls */
+    margin-top: 10px;
 }
 
-/* NEW: Attachment Input and Display Styles */
 .attachment-input-group {
     margin-top: 15px;
     display: flex;
@@ -1672,33 +1779,32 @@ body[data-theme="dark"] .subtask-delete-button:hover {
   background-color: var(--select-bg);
   color: var(--fg);
 
-  font-size: 12px; /* Reduced font size */
+  font-size: 12px; 
   border-radius: 50%;
   user-select: none;
   transition: background-color 0.2s ease;
   text-align: center;
   padding: 7px;
-  box-sizing: border-box; /* Include padding/border in width */
+  box-sizing: border-box;
 }
 
-/* Styling for the "Add Attachment" button in the Add Task section */
 #triggerNewAttachmentInput {
-  background-color: var(--select-bg); /* Use a more neutral background */
-  color: var(--fg); /* Use foreground color for text */
-  border: 1px solid var(--border); /* Add a border */
-  padding: 8px 12px; /* Adjusted padding to be smaller */
-  border-radius: 8px; /* Slightly more rounded corners */
+  background-color: var(--select-bg);
+  color: var(--fg); 
+  border: 1px solid var(--border);
+  padding: 8px 12px; 
+  border-radius: 8px; 
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease;
-  width: auto; /* Allow button to fit content, not stretch */
-  display: flex; /* Allow icon and text to be side-by-side */
+  width: auto;
+  display: flex; 
   align-items: center;
-  justify-content: center; /* Center content */
-  font-size: 16px; /* Keep font size consistent with other buttons */
+  justify-content: center; 
+  font-size: 16px; 
 }
 
 #triggerNewAttachmentInput:hover {
-  background-color: var(--border); /* Darken on hover */
+  background-color: var(--border); 
   border-color: var(--highlight-color);
 }
 
@@ -1713,39 +1819,40 @@ body[data-theme="dark"] #triggerNewAttachmentInput:hover {
   border-color: var(--highlight-color);
 }
 
-/* Adjustments for task-input-group to align items */
 .task-input-group {
     display: flex;
     gap: 10px;
     margin-bottom: 10px;
     margin-top: 14px;
-    align-items: center; /* Vertically align items in the middle */
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    align-items: center;
+    flex-wrap: wrap;
 }
 
-/* Ensure the input field takes up available space */
 .task-input-group .input#taskInput {
     flex-grow: 1;
-    min-width: 150px; /* Ensure it doesn't get too small */
+    min-width: 150px; 
 }
 
-/* Styling for the newAttachmentsDisplay */
 #newAttachmentsDisplay {
-    margin-top: 10px; /* Add some space above the display area */
+    margin-top: 10px;
 }
 
-/* NEW: Recurrence specific styles */
-.recurrence-row {
+.meta-row {
     margin-top: 15px;
     border-top: 1px dashed var(--border);
     padding-top: 15px;
+    align-items: flex-start;
+}
+
+.meta-row .recurrence-details-container {
+    padding-top: 6px;
 }
 
 .recurrence-details-container {
-    flex-direction: column; /* Stack details vertically */
+    flex-direction: column; 
     gap: 10px;
-    width: 100%; /* Take full width */
-    min-width: unset; /* Override min-width from input-field */
+    width: 100%; 
+    min-width: unset; 
 }
 
 .recurrence-details-container .checkbox-group {
@@ -1772,7 +1879,7 @@ body[data-theme="dark"] #triggerNewAttachmentInput:hover {
 .recurrence-details-container input[type="number"],
 .recurrence-details-container input[type="date"] {
     width: auto;
-    min-width: 150px; /* Smaller min-width for recurrence specific inputs */
+    min-width: 150px;
 }
 
 .recurrence-label {
@@ -1789,14 +1896,7 @@ body[data-theme="dark"] #triggerNewAttachmentInput:hover {
   display: none;
 }
 
-/* NEW: Goal specific styles */
-.goal-row { /* Style for the goal selection row in task forms */
-    margin-top: 15px;
-    border-top: 1px dashed var(--border);
-    padding-top: 15px;
-}
-
-#goalsSection { /* Main container for goals */
+#goalsSection {
     margin-top: 20px;
     padding: 20px;
 }
@@ -1820,18 +1920,6 @@ body[data-theme="dark"] #triggerNewAttachmentInput:hover {
     gap: 10px;
 }
 
-.goals-title .circle-icon {
-    background-color: var(--button-bg);
-    color: var(--button-fg);
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
 
 body[data-theme="dark"] .goals-title .circle-icon {
     background-color: var(--highlight-color);
@@ -1854,41 +1942,85 @@ body[data-theme="dark"] .goals-title .circle-icon {
 }
 
 .goals-controls .select-box {
-    min-width: max-content;
+    min-width: 160px;
     width: auto;
-    flex-grow: 1;
-    padding-right: 2.4rem;
+    flex-grow: 0;
+    padding: 9px 30px 9px 14px;
+    font-size: 0.88em;
 }
 
 .goal-list {
     list-style: none;
     padding: 0;
     margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    align-items: start;
 }
 
 .goal-item {
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 10px;
+    padding: 18px;
+    margin-bottom: 0;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    transition: all 0.2s ease-in-out;
+    gap: 12px;
+    transition: box-shadow 0.2s ease-in-out, opacity 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    font-size: 1em;
 }
 
 .goal-item:hover {
     box-shadow: 0 0 8px rgba(74, 162, 255, 0.4);
 }
 
+.goal-item.dragging {
+    opacity: 0.45;
+}
+
+.goal-item.dragover-top {
+    border-top: 3px solid var(--highlight-color);
+}
+
+.goal-item.dragover-bottom {
+    border-bottom: 3px solid var(--highlight-color);
+}
+
 .goal-item-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 8px;
+}
+
+.goal-drag-handle {
+    cursor: grab;
+    color: var(--fg);
+    opacity: 0.4;
+    display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-shrink: 0;
+    padding: 2px 2px 2px 0;
+    touch-action: none;
+    transition: opacity 0.15s ease;
+}
+
+.goal-drag-handle:hover {
+    opacity: 0.9;
+}
+
+.goal-drag-handle:active {
+    cursor: grabbing;
+}
+
+.goal-drag-handle svg {
+    width: 16px;
+    height: 16px;
+    display: block;
 }
 
 .goal-title-display {
@@ -1896,12 +2028,14 @@ body[data-theme="dark"] .goals-title .circle-icon {
     font-weight: bold;
     color: var(--fg);
     flex-grow: 1;
+    line-height: 1.35;
 }
 
 .goal-dates-display {
-    font-size: 0.9em;
+    font-size: 0.85em;
     color: #666;
     flex-shrink: 0;
+    width: 100%;
 }
 body[data-theme="dark"] .goal-dates-display {
     color: #bbb;
@@ -1910,14 +2044,26 @@ body[data-theme="dark"] .goal-dates-display {
 .goal-description-display {
     font-size: 0.95em;
     color: var(--fg);
-    line-height: 1.4;
+    line-height: 1.45;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.goal-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .goal-progress-container {
-    width: 100%;
+    flex-grow: 1;
+    width: auto;
     background-color: var(--goal-progress-bg);
     border-radius: 5px;
-    height: 10px;
+    height: 9px;
     overflow: hidden;
 }
 
@@ -1930,48 +2076,155 @@ body[data-theme="dark"] .goal-dates-display {
 }
 
 .goal-progress-text {
-    font-size: 0.9em;
+    font-size: 0.85em;
     color: var(--fg);
     text-align: right;
-    margin-top: 5px;
+    margin: 0;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.goal-linked-tasks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px dashed var(--border);
+    padding-top: 8px;
+}
+
+.goal-linked-task-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.goal-linked-task-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.goal-show-more-tasks {
+    background: none;
+    border: none;
+    color: var(--button-bg);
+    font-size: 0.88em;
+    cursor: pointer;
+    padding: 5px 4px;
+    text-align: left;
+}
+
+.goal-show-more-tasks:hover {
+    text-decoration: underline;
+}
+
+.goal-add-task-form {
+    display: flex;
+    gap: 8px;
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+}
+
+.goal-add-task-input {
+    flex-grow: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    font-size: 0.9em;
+    height: 36px;
+    width: auto;
+}
+
+.goal-add-task-button {
+    padding: 8px 12px;
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+
+.goal-linked-task-item:hover {
+    background-color: var(--select-bg);
+}
+
+.goal-linked-task-check {
+    color: var(--goal-progress-fill);
+    font-size: 0.95em;
+    width: 14px;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.goal-linked-task-item:not(.done) .goal-linked-task-check {
+    color: #999;
+}
+
+.goal-linked-task-label {
+    color: var(--fg);
+}
+
+.goal-linked-task-item.done .goal-linked-task-label {
+    text-decoration: line-through;
+    color: #888;
+    opacity: 0.75;
+}
+
+.goal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
 }
 
 .goal-actions {
     display: flex;
-    gap: 10px;
+    gap: 6px;
     justify-content: flex-end;
-    margin-top: 10px;
+    margin-top: 0;
 }
 
 .goal-actions .button {
-    padding: 6px 10px;
-    font-size: 0.85em;
+    padding: 5px 8px;
+    font-size: 0.8em;
 }
 
-.goal-status-label {
-    display: inline-block;
-    background-color: var(--select-bg);
-    color: var(--fg);
-    padding: 5px 10px;
-    font-size: 12px;
+.goal-status-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border: none;
+    padding: 6px 26px 6px 12px;
+    font-size: 12.5px;
+    font-weight: 600;
     border-radius: 12px;
+    cursor: pointer;
     user-select: none;
     transition: background-color 0.2s ease;
     text-align: center;
     max-width: max-content;
     box-sizing: border-box;
+    color: white;
+    background-image: url("data:image/svg+xml;utf8,<svg fill='%23ffffff' height='' viewBox='0 0 24 24' width='10' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    flex-shrink: 0;
 }
 
-/* Specific status colors */
-.goal-status-label.active { background-color: #007bff; color: white; }
-.goal-status-label.completed { background-color: #28a745; color: white; }
-.goal-status-label.archived { background-color: #6c757d; color: white; }
+.goal-status-select.active { background-color: #007bff; }
+.goal-status-select.completed { background-color: #28a745; }
+.goal-status-select.archived { background-color: #6c757d; }
 
-body[data-theme="dark"] .goal-status-label.active { background-color: #0056b3; }
-body[data-theme="dark"] .goal-status-label.completed { background-color: #1e7e34; }
-body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268; }
+body[data-theme="dark"] .goal-status-select.active { background-color: #0056b3; }
+body[data-theme="dark"] .goal-status-select.completed { background-color: #1e7e34; }
+body[data-theme="dark"] .goal-status-select.archived { background-color: #5a6268; }
 
-/* Empty state message */
+
 .empty-state {
     text-align: center;
     color: #888;
@@ -1979,9 +2232,7 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
     font-style: italic;
 }
 
-/* --- Media Queries for Responsiveness --- */
 
-/* Tablets and smaller (max-width: 768px) */
 @media (max-width: 768px) {
   body {
     padding: 0 15px;
@@ -1992,7 +2243,7 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   }
 
   #main-navbar {
-    flex-direction: column; /* Stack navbar items vertically */
+    flex-direction: column; 
     align-items: flex-start;
     padding: 10px 15px;
     gap: 10px;
@@ -2015,39 +2266,35 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
     gap: 8px;
   }
 
-  #auth-nav-items input {
-
-  }
-
   .nav-button, .user-email {
     text-align: center;
   }
 
-  /* Search input responsiveness */
   .search-input {
-    width: 100%; /* Full width on smaller screens */
-    max-width: none; /* Remove max-width constraint */
+    width: 100%; 
+    max-width: none; 
   }
 
   #toggleNotes.notes-toggle,
   #themeToggle.theme-toggle,
-  #toggleGoals.goals-toggle { /* NEW: Added goals-toggle */
+  #toggleGoals.goals-toggle { 
     font-size: 1.2rem;
   }
 
   #toggleNotes.notes-toggle svg,
   #themeToggle.theme-toggle svg,
-  #toggleGoals.goals-toggle svg { /* NEW: Added goals-toggle */
+  #toggleGoals.goals-toggle svg { 
     width: 20px;
     height: 20px;
   }
 
-  #timer {
-    font-size: 40px;
+  .pomodoro-ring-wrap {
+    width: 160px;
+    height: 160px;
   }
 
-  #timerBarContainer {
-    width: 70%; /* Increase timer bar width on smaller screens */
+  #timer {
+    font-size: 2rem;
   }
 
   .timer-controls {
@@ -2056,7 +2303,7 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   }
 
   .timer-controls .input {
-    width: 60px;
+    width: 56px;
   }
 
   .task-add-section {
@@ -2064,7 +2311,7 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   }
 
   .task-input-group {
-    flex-direction: column; /* Stack task input group vertically */
+    flex-direction: column; 
     align-items: stretch;
   }
 
@@ -2073,24 +2320,24 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   }
 
   .task-details-row {
-    flex-direction: column; /* Stack task details vertically */
+    flex-direction: column;
     gap: 10px;
     margin-left: 0;
   }
 
   .input-field {
-    width: 100%; /* Ensure input fields take full width */
+    width: 100%; 
     min-width: unset;
   }
 
   .select-box,
   .date-input,
   .time-input {
-    min-width: 100%; /* Make select boxes and date/time inputs full width */
+    min-width: 100%; 
   }
 
   #taskList li {
-    flex-direction: column; /* Stack task list items vertically */
+    flex-direction: column; 
     align-items: flex-start;
     padding: 10px;
     gap: 8px;
@@ -2105,7 +2352,7 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   .due-date-display,
   .notification-time-display,
   .priority-label,
-  .goal-label { /* NEW: Added goal-label */
+  .goal-label { 
     width: 100%;
     min-width: unset;
     text-align: center;
@@ -2132,12 +2379,14 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   }
 
   .notes-sidebar {
-    width: 60vw; /* Take up more space on tablets */
+    width: 60vw; 
   }
 
-  body.notes-open #mainContent {
-    transform: translateX(-15vw); /* Adjust main content transform */
-  }
+body.notes-open #mainContent {
+  width: calc(100% - 62vw);
+  margin-right: 62vw;
+  margin-left: 0;
+}
 
   .custom-modal-content {
     width: 95%;
@@ -2149,10 +2398,9 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   }
 
   .grid-container {
-    grid-template-columns: 1fr; /* Stack grid items on smaller screens */
+    grid-template-columns: 1fr;
   }
 
-  /* Subtask responsiveness */
   .subtasks-container {
     padding-left: 10px;
   }
@@ -2164,7 +2412,6 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
     width: 100%;
   }
 
-  /* Filter controls responsiveness for tablets */
   .filter-controls {
       flex-direction: column;
       align-items: stretch;
@@ -2176,13 +2423,11 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
       min-width: unset;
   }
 
-  /* Recurrence responsiveness */
   .recurrence-details-container input[type="number"],
   .recurrence-details-container input[type="date"] {
       min-width: 100%;
   }
 
-  /* Goals section responsiveness */
   .goals-controls {
       flex-direction: column;
       align-items: stretch;
@@ -2202,7 +2447,6 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   }
 }
 
-/* Mobile phones (max-width: 480px) */
 @media (max-width: 480px) {
   body {
     padding: 0 10px;
@@ -2236,30 +2480,35 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
     max-width: 100%;
   }
 
-  /* Search input responsiveness */
   .search-input {
-    width: 100%; /* Full width on mobile */
+    width: 100%;
   }
 
   #toggleNotes.notes-toggle,
   #themeToggle.theme-toggle,
-  #toggleGoals.goals-toggle { /* NEW: Added goals-toggle */
+  #toggleGoals.goals-toggle { 
     font-size: 1.2rem;
   }
 
   #toggleNotes.notes-toggle svg,
   #themeToggle.theme-toggle svg,
-  #toggleGoals.goals-toggle svg { /* NEW: Added goals-toggle */
+  #toggleGoals.goals-toggle svg { 
     width: 20px;
     height: 20px;
   }
 
-  #timer {
-    font-size: 32px;
+  .pomodoro-ring-wrap {
+    width: 140px;
+    height: 140px;
   }
 
-  #timerBarContainer {
-    width: 85%;
+  #timer {
+    font-size: 1.7rem;
+  }
+
+  .pomodoro-modes {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .timer-controls {
@@ -2311,18 +2560,18 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   .due-date-display,
   .notification-time-display,
   .priority-label,
-  .goal-label { /* NEW: Added goal-label */
+  .goal-label { 
     font-size: 11px;
     padding: 4px 8px;
   }
 
   .delete-button,
   .edit-button {
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
+    width: 28px;
+    height: 28px;
   }
 
+  .delete-button svg,
   .edit-button svg {
     width: 14px;
     height: 14px;
@@ -2341,12 +2590,13 @@ body[data-theme="dark"] .goal-status-label.archived { background-color: #5a6268;
   }
 
   .notes-sidebar {
-    width: 80vw; /* Take up more space on mobile */
+    width: 80vw; 
   }
-
-  body.notes-open #mainContent {
-    transform: translateX(-20vw); /* Adjust transform for main content */
-  }
+body.notes-open #mainContent {
+  width: calc(100% - 82vw);
+  margin-right: 82vw;
+  margin-left: 0;
+}
 
   .custom-modal-content {
     padding: 15px;
