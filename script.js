@@ -339,6 +339,7 @@ async function addTask(content, category = "Personal", priority = "Medium", dueD
 
         if (error) {
             console.error("Add task to Supabase failed:", error.message);
+            showCustomAlert("Couldn't save task: " + error.message);
             return null;
         }
         newTask = data[0];
@@ -495,7 +496,10 @@ async function saveNote(noteId, title, content, category) {
             { id: noteId, user_id: currentUser.id, ...updates },
             { onConflict: 'id' } 
         );
-        if (error) console.error("Failed to save note to Supabase:", error.message);
+        if (error) {
+            console.error("Failed to save note to Supabase:", error.message);
+            showCustomAlert("Couldn't save note: " + error.message);
+        }
     } else {
         let guestNotes = getGuestNotes();
         const noteIndex = guestNotes.findIndex(n => n.id === noteId);
@@ -529,6 +533,7 @@ async function createNote() {
 
         if (error) {
             console.error("Failed to create note in Supabase:", error.message);
+            showCustomAlert("Couldn't create note: " + error.message);
             return;
         }
         allNotes.unshift(data[0]); 
@@ -685,6 +690,7 @@ async function addGoal(title, description, startDate, dueDate, status) {
 
         if (error) {
             console.error("Add goal to Supabase failed:", error.message);
+            showCustomAlert("Couldn't save goal: " + error.message);
             return null;
         }
         newGoal = data[0];
